@@ -5,7 +5,6 @@ import {
   Check,
   CheckCircle2,
   Code2,
-  Coffee,
   Columns,
   Cpu,
   Download,
@@ -84,7 +83,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="#features">Features</a>
             <a href="#landscape">VS Code Vibe</a>
             <a href="#download">Download</a>
-            <a href="#support">Support</a>
+            <a href="#community">Community</a>
           </div>
 
           <div className="nav-actions">
@@ -132,20 +131,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <ArrowRight size={18} />
           </button>
 
+          <button className="cta-install" onClick={handleInstallClick}>
+            <Download size={18} />
+            <span>Install App (APK)</span>
+          </button>
+
           <a
-            href="https://buymeacoffee.com/khalidabdullah"
+            href="https://github.com/khalidabdullahh/CodeForgeMobile"
             target="_blank"
             rel="noreferrer"
-            className="cta-coffee"
+            className="cta-secondary"
           >
-            <Coffee size={18} />
-            <span>Buy Me a Coffee</span>
+            <Github size={17} />
+            <span>Star on GitHub</span>
           </a>
-
-          <button className="cta-secondary" onClick={handleInstallClick}>
-            <Download size={17} />
-            <span>Install App / APK</span>
-          </button>
         </div>
 
         {/* Hero Interactive App Mockup Frame */}
@@ -320,27 +319,38 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Buy Me A Coffee Support Section */}
-      <section id="support" className="support-section">
+      {/* Open Source Community Section */}
+      <section id="community" className="support-section">
         <div className="coffee-container">
-          <div className="coffee-icon-wrap">
-            <Coffee size={36} className="text-amber-400" />
+          <div className="coffee-icon-wrap" style={{ background: 'rgba(37, 99, 235, 0.15)', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+            <Github size={36} className="text-blue-400" />
           </div>
-          <h2>Support the Creator</h2>
+          <h2>Join the Open Source Community</h2>
           <p>
-            CodeForge Mobile is an open-source labor of love by <strong>Khalid Abdullah</strong>.
-            If this project helps your coding workflow, consider buying me a coffee to support future development!
+            CodeForge Mobile is 100% free and open-source created by <strong>Khalid Abdullah</strong>.
+            Contribute features, report issues, or star the project on GitHub to help us grow!
           </p>
 
-          <a
-            href="https://buymeacoffee.com/khalidabdullah"
-            target="_blank"
-            rel="noreferrer"
-            className="coffee-main-button"
-          >
-            <Coffee size={22} />
-            <span>Buy Khalid a Coffee ☕</span>
-          </a>
+          <div className="flex gap-3 justify-center flex-wrap">
+            <a
+              href="https://github.com/khalidabdullahh/CodeForgeMobile"
+              target="_blank"
+              rel="noreferrer"
+              className="coffee-main-button"
+              style={{ background: '#2563eb', color: 'white' }}
+            >
+              <Star size={20} />
+              <span>Star on GitHub ⭐️</span>
+            </a>
+            <button
+              className="coffee-main-button"
+              style={{ background: '#1e293b', color: '#e2e8f0', border: '1px solid #334155' }}
+              onClick={onLaunchIde}
+            >
+              <Play size={20} />
+              <span>Launch Web IDE 🚀</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -359,8 +369,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="https://github.com/khalidabdullahh/CodeForgeMobile/blob/main/LICENSE" target="_blank" rel="noreferrer">
               MIT License
             </a>
-            <a href="https://buymeacoffee.com/khalidabdullah" target="_blank" rel="noreferrer">
-              Buy Me a Coffee
+            <a href="https://codeforgemobile.pages.dev" target="_blank" rel="noreferrer">
+              Live Website
             </a>
           </div>
         </div>

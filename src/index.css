@@ -1548,24 +1548,45 @@ button, input, textarea, select {
   transform: translateY(-2px);
 }
 
-.cta-coffee {
-  background: #fbbf24;
-  color: #0f172a;
+.cta-install {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
   border: 0;
+  padding: 13px 22px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+  transition: all 0.2s;
+}
+
+.cta-install:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(-2px);
+}
+
+.cta-coffee, .cta-github {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
   padding: 13px 20px;
   border-radius: 10px;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  box-shadow: 0 6px 20px rgba(251, 191, 36, 0.3);
   transition: all 0.2s;
 }
 
-.cta-coffee:hover {
-  background: #f59e0b;
+.cta-coffee:hover, .cta-github:hover {
+  background: #334155;
+  color: white;
   transform: translateY(-2px);
 }
 

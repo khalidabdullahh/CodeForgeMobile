@@ -921,16 +921,6 @@ function App() {
             <kbd>⌘P</kbd>
           </button>
 
-          <a
-            href="https://buymeacoffee.com/khalidabdullah"
-            target="_blank"
-            rel="noreferrer"
-            className="icon-btn coffee-top-btn"
-            title="Buy Me a Coffee"
-          >
-            <Coffee size={16} />
-          </a>
-
           <button className="icon-btn ai-badge-btn" title="AI Copilot" onClick={() => setView('ai')}>
             <Bot size={17} />
           </button>

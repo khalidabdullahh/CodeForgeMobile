@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
   Bot,
+  Check,
   CheckCircle2,
   Code2,
   Coffee,
@@ -12,6 +13,7 @@ import {
   FolderGit2,
   Github,
   Globe,
+  Info,
   Keyboard,
   Layers,
   Layout,
@@ -25,6 +27,7 @@ import {
   Sparkles,
   Star,
   Terminal,
+  X,
   Zap
 } from 'lucide-react';
 
@@ -39,6 +42,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onDownloadZip,
   onExportAndroid,
 }) => {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [installedSuccess, setInstalledSuccess] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstalledSuccess(true);
+        setDeferredPrompt(null);
+      }
+    } else {
+      setShowInstallModal(true);
+    }
+  };
+
   return (
     <div className="landing-container">
       {/* Navbar */}
@@ -69,9 +98,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <Github size={16} />
               <span>Star Repo</span>
             </a>
-            <button className="launch-btn" onClick={onLaunchIde}>
-              <Play size={15} />
-              <span>Launch IDE</span>
+            
+            {/* Top Right: Install App / Download APK Button */}
+            <button className="install-nav-btn" onClick={handleInstallClick}>
+              <Download size={15} />
+              <span>Install App (APK)</span>
             </button>
           </div>
         </div>
@@ -111,9 +142,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <span>Buy Me a Coffee</span>
           </a>
 
-          <button className="cta-secondary" onClick={onDownloadZip}>
+          <button className="cta-secondary" onClick={handleInstallClick}>
             <Download size={17} />
-            <span>Export Source (ZIP)</span>
+            <span>Install App / APK</span>
           </button>
         </div>
 
@@ -261,10 +292,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="download-options">
             <div className="download-tile">
               <Globe size={28} />
-              <h4>Web & PWA App</h4>
-              <p>Run directly in Chrome/Safari or install to home screen.</p>
-              <button className="tile-btn" onClick={onLaunchIde}>
-                <Play size={15} /> Launch Instant Web IDE
+              <h4>1-Click Install App (PWA)</h4>
+              <p>Install directly to your Android home screen for instant offline use.</p>
+              <button className="tile-btn" onClick={handleInstallClick}>
+                <Download size={15} /> Install to Home Screen
               </button>
             </div>
 
@@ -334,6 +365,65 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </div>
       </footer>
+
+      {/* 1-Click Install Modal */}
+      {showInstallModal && (
+        <div className="install-modal-backdrop" onClick={() => setShowInstallModal(false)}>
+          <div className="install-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="flex items-center gap-2">
+                <Smartphone className="text-blue-400" size={20} />
+                <h3>Install CodeForge Mobile</h3>
+              </div>
+              <button className="close-btn" onClick={() => setShowInstallModal(false)}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="modal-content">
+              <div className="install-step">
+                <span className="step-num">1</span>
+                <div>
+                  <b>Instant Android / Mobile Installation:</b>
+                  <p>
+                    Open this page in <strong>Chrome</strong> on Android or <strong>Safari</strong> on iOS.
+                    Tap the browser menu <strong>(⋮)</strong> and select <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="install-step">
+                <span className="step-num">2</span>
+                <div>
+                  <b>Offline Ready:</b>
+                  <p>Once installed, CodeForge will appear as an app icon on your phone and open in full-screen landscape mode with 0 latency.</p>
+                </div>
+              </div>
+
+              <div className="modal-buttons">
+                <button
+                  className="modal-btn-primary"
+                  onClick={() => {
+                    onLaunchIde();
+                    setShowInstallModal(false);
+                  }}
+                >
+                  <Play size={15} /> Launch Instant Web IDE
+                </button>
+                <button
+                  className="modal-btn-secondary"
+                  onClick={() => {
+                    onDownloadZip();
+                    setShowInstallModal(false);
+                  }}
+                >
+                  <Download size={15} /> Download Source .ZIP
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

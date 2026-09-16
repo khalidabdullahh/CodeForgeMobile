@@ -3,10 +3,12 @@ import Editor, { OnMount } from '@monaco-editor/react';
 import JSZip from 'jszip';
 import {
   Archive,
+  ArrowLeft,
   Bot,
   Check,
   ChevronDown,
   Code2,
+  Coffee,
   Columns,
   Copy,
   Download,
@@ -18,6 +20,8 @@ import {
   GitBranch,
   GitCommit,
   Github,
+  Globe,
+  Home,
   Keyboard,
   Maximize2,
   Menu,
@@ -33,6 +37,7 @@ import {
   Search,
   Send,
   Settings,
+  Smartphone,
   Sparkles,
   Terminal,
   Trash2,
@@ -42,6 +47,7 @@ import {
   X,
   Zap
 } from 'lucide-react';
+import { LandingPage } from './LandingPage';
 
 type FileItem = { id: string; name: string; path: string; language: string; content: string; modified?: boolean };
 type Extension = { id: string; name: string; description: string; installed: boolean };
@@ -300,6 +306,10 @@ const themeBgMap: Record<ThemeName, string> = {
 };
 
 function App() {
+  const [inIdeMode, setInIdeMode] = useState<boolean>(() => {
+    return window.location.search.includes('mode=ide') || window.location.hash === '#ide';
+  });
+
   const [files, setFiles] = useState<FileItem[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('codeforge-files') || 'null');
@@ -344,6 +354,10 @@ function App() {
   const [diagnostics, setDiagnostics] = useState('No problems detected.');
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
 
+  // Landscape state & banner
+  const [isLandscape, setIsLandscape] = useState<boolean>(() => window.innerWidth > window.innerHeight);
+  const [showLandscapeBanner, setShowLandscapeBanner] = useState(true);
+
   // AI State
   const [aiProvider, setAiProvider] = useState<AiProvider>(() => (localStorage.getItem('codeforge-ai-provider') as AiProvider) || 'gemini');
   const [aiApiKey, setAiApiKey] = useState(() => localStorage.getItem('codeforge-ai-key') || '');
@@ -373,6 +387,19 @@ function App() {
   useEffect(() => localStorage.setItem('codeforge-ai-provider', aiProvider), [aiProvider]);
   useEffect(() => localStorage.setItem('codeforge-ai-key', aiApiKey), [aiApiKey]);
   useEffect(() => localStorage.setItem('codeforge-ai-endpoint', aiCustomEndpoint), [aiCustomEndpoint]);
+
+  // Track orientation changes
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
 
   // Handle iframe console messages
   useEffect(() => {
@@ -544,6 +571,21 @@ function App() {
     editorRef.current?.focus();
   };
 
+  // Switch to landscape mode helper
+  const requestLandscapeOrientation = async () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+      if ('orientation' in screen && (screen.orientation as any).lock) {
+        await (screen.orientation as any).lock('landscape');
+      }
+    } catch (err) {
+      // Fallback notification
+      alert('Please rotate your device to landscape mode for the complete VS Code experience!');
+    }
+  };
+
   const runCommand = (cmd: string) => {
     const clean = cmd.trim();
     if (!clean) return;
@@ -690,6 +732,7 @@ function App() {
     if (action === 'settings') setView('settings');
     if (action === 'format') formatFile();
     if (action === 'zip') exportProjectZip();
+    if (action === 'landing') setInIdeMode(false);
     if (action === 'save') {
       setFiles(prev => prev.map(f => (f.id === active.id ? { ...f, modified: false } : f)));
       setTerminal(prev => `${prev}\n✓ Saved ${active.name}`);
@@ -741,7 +784,6 @@ function App() {
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.';
         setAiMessages(prev => [...prev, { role: 'assistant', content: reply }]);
       } else {
-        // OpenAI compatible endpoint
         const endpoint = aiCustomEndpoint.replace(/\/+$/, '') + '/chat/completions';
         const res = await fetch(endpoint, {
           method: 'POST',
@@ -789,6 +831,17 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   });
 
+  // If user is on landing page view
+  if (!inIdeMode) {
+    return (
+      <LandingPage
+        onLaunchIde={() => setInIdeMode(true)}
+        onDownloadZip={exportProjectZip}
+        onExportAndroid={exportAndroidPackage}
+      />
+    );
+  }
+
   const html = files.find(f => f.name === 'index.html')?.content || '';
   const css = files.find(f => f.name === 'style.css')?.content || '';
   const js = files.find(f => f.name === 'script.js')?.content || '';
@@ -825,9 +878,30 @@ function App() {
 
   return (
     <div className={`app-shell theme-${theme}`} style={{ background: themeBgMap[theme] }}>
+      {/* Landscape Helper Banner for Mobile Portrait Viewers */}
+      {!isLandscape && showLandscapeBanner && (
+        <div className="landscape-banner">
+          <div className="landscape-banner-content">
+            <Smartphone className="rotate-icon" size={16} />
+            <span>Rotate to Landscape for full desktop VS Code power!</span>
+          </div>
+          <div className="landscape-banner-actions">
+            <button className="banner-rotate-btn" onClick={requestLandscapeOrientation}>
+              Rotate Now
+            </button>
+            <button className="banner-close-btn" onClick={() => setShowLandscapeBanner(false)}>
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Navigation Bar */}
       <header className="topbar">
         <div className="topbar-left">
+          <button className="icon-btn" title="Back to Home / Landing Page" onClick={() => setInIdeMode(false)}>
+            <Home size={17} />
+          </button>
           <button className="icon-btn" aria-label="Open explorer" onClick={() => setSidebar(v => !v)}>
             <Menu size={19} />
           </button>
@@ -846,6 +920,17 @@ function App() {
             <span>Command Palette</span>
             <kbd>⌘P</kbd>
           </button>
+
+          <a
+            href="https://buymeacoffee.com/khalidabdullah"
+            target="_blank"
+            rel="noreferrer"
+            className="icon-btn coffee-top-btn"
+            title="Buy Me a Coffee"
+          >
+            <Coffee size={16} />
+          </a>
+
           <button className="icon-btn ai-badge-btn" title="AI Copilot" onClick={() => setView('ai')}>
             <Bot size={17} />
           </button>
@@ -986,6 +1071,9 @@ function App() {
               </button>
               <button onClick={exportAndroidPackage}>
                 <Download size={15} /> Android Package Setup
+              </button>
+              <button onClick={() => setInIdeMode(false)}>
+                <Home size={15} /> Landing Page
               </button>
             </div>
 
@@ -1495,6 +1583,9 @@ function App() {
             </button>
             <button onClick={() => executePalette('zip')}>
               <Archive size={15} /> Export Project as ZIP
+            </button>
+            <button onClick={() => executePalette('landing')}>
+              <Home size={15} /> Return to Landing Page
             </button>
             <button onClick={() => executePalette('terminal')}>
               <Terminal size={15} /> Toggle Terminal

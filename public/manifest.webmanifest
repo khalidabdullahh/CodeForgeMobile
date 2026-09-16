@@ -1,1 +1,30 @@
-{"name":"CodeForge Mobile","short_name":"CodeForge","start_url":"./","display":"standalone","background_color":"#0b0e12","theme_color":"#1683ff","description":"A mobile coding IDE for Android and the web","icons":[]}
+{
+  "name": "CodeForge Mobile — Android IDE",
+  "short_name": "CodeForge",
+  "start_url": "./?mode=ide",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0e12",
+  "theme_color": "#1683ff",
+  "description": "An Android-first, VS Code-inspired coding IDE for phones and the web.",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Launch IDE",
+      "url": "./?mode=ide",
+      "description": "Open CodeForge IDE workspace"
+    }
+  ]
+}

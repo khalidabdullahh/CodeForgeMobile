@@ -1,0 +1,43 @@
+[
+  {
+    "name": "Edit a file and retain it after refresh",
+    "sanity": true,
+    "viewport": "desktop",
+    "covers": ["Monaco editor editing", "virtual file system", "local persistence", "tabs"],
+    "description": "Verifies the primary coding workflow edits a file and preserves the result locally.",
+    "steps": ["Open index.html", "Change visible code in the editor", "Refresh the page"],
+    "expected": "The edited file opens with the changed content still present and the tab remains usable."
+  },
+  {
+    "name": "Create, rename, duplicate, and delete a project file",
+    "viewport": "mobile",
+    "covers": ["file creation", "file rename", "file duplication", "file deletion", "touch-friendly explorer"],
+    "description": "Verifies the mobile explorer supports the core file-management lifecycle.",
+    "steps": ["Create a new JavaScript file", "Rename it", "Duplicate it", "Delete the duplicate"],
+    "expected": "The renamed original remains in the explorer and the duplicate is removed."
+  },
+  {
+    "name": "Run project and use terminal commands",
+    "viewport": "desktop",
+    "covers": ["runtime preview", "terminal", "npm run dev", "command execution UI"],
+    "description": "Verifies the integrated runtime opens the project preview and the terminal accepts supported commands.",
+    "steps": ["Open the terminal", "Run npm run dev", "Run ls"],
+    "expected": "Runtime Preview opens and the terminal reports the workspace files."
+  },
+  {
+    "name": "Use source control and extensions",
+    "viewport": "desktop",
+    "covers": ["local Git status", "Git commit", "branch switching", "extension install"],
+    "description": "Verifies the IDE exposes local source-control and extension workflows.",
+    "steps": ["Open Source Control", "Enter a commit message and commit", "Switch branch", "Open Extensions and install an extension"],
+    "expected": "The commit appears in history, the selected branch changes, and the extension shows as installed."
+  },
+  {
+    "name": "Import and export a CodeForge project",
+    "viewport": "mobile",
+    "covers": ["project export", "project import", "Android packaging export", "offline workspace"],
+    "description": "Verifies project portability and Android packaging preparation controls are reachable on mobile.",
+    "steps": ["Export the project", "Import the exported CodeForge project", "Open the Android package action"],
+    "expected": "The project is restored and Android packaging configuration files are offered for export."
+  }
+]

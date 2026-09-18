@@ -3,13 +3,11 @@ import Editor, { OnMount } from '@monaco-editor/react';
 import JSZip from 'jszip';
 import {
   Archive,
-  ArrowLeft,
   Bot,
   Check,
   ChevronDown,
   Cloud,
   Code2,
-  Coffee,
   Columns,
   Copy,
   Download,
@@ -18,18 +16,13 @@ import {
   FileText,
   FolderOpen,
   FolderPlus,
-  Gamepad2,
   GitBranch,
   GitCommit,
   Github,
-  Globe,
   Home,
   Keyboard,
   Layers,
-  Layout,
-  Maximize2,
   Menu,
-  MessageSquare,
   Mic,
   MicOff,
   Package,
@@ -38,7 +31,6 @@ import {
   Plus,
   Radio,
   RefreshCw,
-  RotateCcw,
   RotateCw,
   Save,
   Search,
@@ -711,7 +703,14 @@ function App() {
   const [pyRunning, setPyRunning] = useState(false);
 
   // GitHub Cloud Sync State
-  const [ghToken, setGhToken] = useState(() => localStorage.getItem('codeforge-gh-token') || '');
+  const [ghToken, setGhToken] = useState(() => {
+    try {
+      localStorage.removeItem('codeforge-gh-token'); // Security: clear any persistent token
+      return sessionStorage.getItem('codeforge-gh-token') || '';
+    } catch {
+      return '';
+    }
+  });
   const [ghRepoInput, setGhRepoInput] = useState(() => localStorage.getItem('codeforge-gh-repo') || 'khalidabdullahh/CodeForgeMobile');
   const [ghLoading, setGhLoading] = useState(false);
   const [ghStatusMsg, setGhStatusMsg] = useState('');
@@ -720,8 +719,23 @@ function App() {
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
 
   // Live Share State
-  const [liveShareId, setLiveShareId] = useState(() => localStorage.getItem('codeforge-liveshare-id') || 'forge-room-101');
-  const [liveShareConnected, setLiveShareConnected] = useState(false);
+  const [liveShareId, setLiveShareId] = useState(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryRoom = urlParams.get('room');
+      if (queryRoom) return queryRoom;
+      return localStorage.getItem('codeforge-liveshare-id') || 'forge-room-101';
+    } catch {
+      return 'forge-room-101';
+    }
+  });
+  const [liveShareConnected, setLiveShareConnected] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).has('room');
+    } catch {
+      return false;
+    }
+  });
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
   const liveChannelRef = useRef<BroadcastChannel | null>(null);
 
@@ -754,7 +768,11 @@ function App() {
   useEffect(() => localStorage.setItem('codeforge-ai-provider', aiProvider), [aiProvider]);
   useEffect(() => localStorage.setItem('codeforge-ai-key', aiApiKey), [aiApiKey]);
   useEffect(() => localStorage.setItem('codeforge-ai-endpoint', aiCustomEndpoint), [aiCustomEndpoint]);
-  useEffect(() => localStorage.setItem('codeforge-gh-token', ghToken), [ghToken]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('codeforge-gh-token', ghToken);
+    } catch {}
+  }, [ghToken]);
   useEffect(() => localStorage.setItem('codeforge-gh-repo', ghRepoInput), [ghRepoInput]);
 
   // Track orientation changes
@@ -787,7 +805,12 @@ function App() {
         setFiles(prev => prev.map(f => f.id === payload.fileId ? { ...f, content: payload.content, modified: true } : f));
       } else if (type === 'peer-joined') {
         setConnectedPeers(prev => Array.from(new Set([...prev, sender || 'Peer'])));
-        setTerminal(prev => `${prev}\n👥 [Live Share] New peer joined the room!`);
+        setTerminal(prev => `${prev}\n👥 [Live Share] New peer joined room "${liveShareId}"!`);
+        // Share current workspace snapshot to newly joined peer
+        channel.postMessage({ type: 'sync-snapshot', payload: files, sender: 'Host' });
+      } else if (type === 'sync-snapshot' && Array.isArray(payload) && payload.length) {
+        setFiles(payload);
+        setTerminal(prev => `${prev}\n👥 [Live Share] Received synced workspace snapshot (${payload.length} files).`);
       }
     };
     channel.postMessage({ type: 'peer-joined', sender: 'Dev-' + Math.floor(Math.random() * 1000) });
@@ -795,7 +818,7 @@ function App() {
       channel.close();
       liveChannelRef.current = null;
     };
-  }, [liveShareConnected, liveShareId]);
+  }, [liveShareConnected, liveShareId, files]);
 
   // Handle iframe console messages
   useEffect(() => {
@@ -1031,6 +1054,7 @@ function App() {
   };
 
   const runPythonCode = async (code: string) => {
+    if (pyRunning) return;
     setPyRunning(true);
     setPanel(true);
     setTerminal(prev => `${prev}\n$ python ${active.name}\n⏳ Initializing Pyodide Python 3.12 runtime...`);
@@ -1071,7 +1095,21 @@ function App() {
     else if (lower === 'tree') setTerminal(prev => `${prev}\n$ tree\n${files.map(f => `├── ${f.path}`).join('\n')}`);
     else if (lower === 'pwd') setTerminal(prev => `${prev}\n$ pwd\n/codeforge/workspace`);
     else if (lower.startsWith('python ') || lower.startsWith('py ')) {
-      const target = files.find(f => f.language === 'python' || f.name.endsWith('.py')) || active;
+      const parts = clean.split(/\s+/);
+      const targetName = parts[1];
+      let target = active;
+      if (targetName) {
+        const found = files.find(f => f.name.toLowerCase() === targetName.toLowerCase() || f.path.toLowerCase() === targetName.toLowerCase());
+        if (!found) {
+          setTerminal(prev => `${prev}\n$ ${clean}\npython: can't open file '${targetName}': No such file`);
+          setCommand('');
+          setPanel(true);
+          return;
+        }
+        target = found;
+      } else {
+        target = files.find(f => f.language === 'python' || f.name.endsWith('.py')) || active;
+      }
       runPythonCode(target.content);
     } else if (lower.startsWith('cat ')) {
       const name = clean.slice(4).trim();
@@ -1121,10 +1159,15 @@ function App() {
     setGhStatusMsg('⏳ Pushing files directly to GitHub...');
     try {
       let sha: string | undefined;
+      const encodedOwner = encodeURIComponent(owner.trim());
+      const encodedRepo = encodeURIComponent(repo.trim());
+      const encodedPath = active.path.split('/').map(encodeURIComponent).join('/');
+      const encodedBranch = encodeURIComponent(branch.trim());
+
       // Check existing SHA
-      const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${active.path}?ref=${branch}`, {
+      const getRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${encodedPath}?ref=${encodedBranch}`, {
         headers: {
-          Authorization: `token ${ghToken}`,
+          Authorization: `token ${ghToken.trim()}`,
           Accept: 'application/vnd.github.v3+json'
         }
       });
@@ -1133,17 +1176,17 @@ function App() {
         sha = data.sha;
       }
       // Put content
-      const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${active.path}`, {
+      const putRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${encodedPath}`, {
         method: 'PUT',
         headers: {
-          Authorization: `token ${ghToken}`,
+          Authorization: `token ${ghToken.trim()}`,
           Accept: 'application/vnd.github.v3+json',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           message: gitMessage || `Update ${active.path} via CodeForge Mobile`,
           content: btoa(unescape(encodeURIComponent(active.content))),
-          branch,
+          branch: branch.trim(),
           sha
         })
       });
@@ -1816,8 +1859,8 @@ function App() {
               <div className="git-card">
                 <Cloud size={20} className="text-blue-400" />
                 <div>
-                  <b>Direct Push & Pull from Mobile</b>
-                  <p>Commit and push modified files directly to your GitHub repo branches using a Personal Access Token.</p>
+                  <b>Push Current File to Remote</b>
+                  <p>Commit and push the currently active file directly to your GitHub repository using a Personal Access Token.</p>
                 </div>
               </div>
 
@@ -1863,7 +1906,7 @@ function App() {
               <div className="view-head">
                 <div className="flex items-center gap-2">
                   <Radio size={16} className={liveShareConnected ? 'text-green-400 animate-pulse' : 'text-slate-400'} />
-                  <b>Realtime Live Share & Peer Coding</b>
+                  <b>Live Share Peer Collaboration</b>
                 </div>
                 <button className="pill-btn" onClick={() => setView('editor')}>
                   <X size={14} />
@@ -1873,8 +1916,8 @@ function App() {
               <div className="git-card">
                 <Users size={20} className="text-green-400" />
                 <div>
-                  <b>P2P Code Collaboration Room</b>
-                  <p>Share this Room ID with another browser tab, phone, or friend to live-sync code edits in real time!</p>
+                  <b>Broadcast Collaboration Room</b>
+                  <p>Share this Room ID with another browser tab or window to live-sync code edits and workspace snapshots!</p>
                 </div>
               </div>
 
@@ -1888,9 +1931,16 @@ function App() {
                   />
                   <button
                     className="action-btn"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/?mode=ide&room=${liveShareId}`);
-                      alert('Room invite link copied to clipboard!');
+                    aria-label="Copy collaboration room invite link"
+                    title="Copy invite link"
+                    onClick={async () => {
+                      const link = `${window.location.origin}/?mode=ide&room=${encodeURIComponent(liveShareId)}`;
+                      try {
+                        await navigator.clipboard.writeText(link);
+                        alert('Room invite link copied to clipboard!');
+                      } catch {
+                        prompt('Copy this collaboration room link:', link);
+                      }
                     }}
                   >
                     <Share2 size={15} />

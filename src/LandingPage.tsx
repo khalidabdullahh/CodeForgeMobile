@@ -2,26 +2,16 @@ import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
   Bot,
-  Check,
-  CheckCircle2,
   Code2,
   Columns,
-  Cpu,
   Download,
-  ExternalLink,
   FolderGit2,
   Github,
   Globe,
-  Info,
   Keyboard,
-  Layers,
-  Layout,
   Maximize2,
-  Moon,
   Palette,
   Play,
-  RotateCcw,
-  ShieldCheck,
   Smartphone,
   Sparkles,
   Star,
@@ -43,7 +33,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 }) => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
-  const [installedSuccess, setInstalledSuccess] = useState(false);
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -59,7 +48,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
-        setInstalledSuccess(true);
         setDeferredPrompt(null);
       }
     } else {

@@ -788,6 +788,11 @@ function App() {
     };
   }, []);
 
+  const filesRef = useRef(files);
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+
   // Handle Live Share BroadcastChannel
   useEffect(() => {
     if (!liveShareConnected) {
@@ -806,8 +811,8 @@ function App() {
       } else if (type === 'peer-joined') {
         setConnectedPeers(prev => Array.from(new Set([...prev, sender || 'Peer'])));
         setTerminal(prev => `${prev}\n👥 [Live Share] New peer joined room "${liveShareId}"!`);
-        // Share current workspace snapshot to newly joined peer
-        channel.postMessage({ type: 'sync-snapshot', payload: files, sender: 'Host' });
+        // Share current workspace snapshot to newly joined peer using filesRef
+        channel.postMessage({ type: 'sync-snapshot', payload: filesRef.current, sender: 'Host' });
       } else if (type === 'sync-snapshot' && Array.isArray(payload) && payload.length) {
         setFiles(payload);
         setTerminal(prev => `${prev}\n👥 [Live Share] Received synced workspace snapshot (${payload.length} files).`);
@@ -818,7 +823,7 @@ function App() {
       channel.close();
       liveChannelRef.current = null;
     };
-  }, [liveShareConnected, liveShareId, files]);
+  }, [liveShareConnected, liveShareId]);
 
   // Handle iframe console messages
   useEffect(() => {

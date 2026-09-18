@@ -6,6 +6,10 @@
 
 <br />
 
+<p align="center">
+  <img src="preview.png" width="100%" alt="CodeForge Mobile IDE Preview" />
+</p>
+
 [![Try Web IDE](https://img.shields.io/badge/🚀_LAUNCH_WEB_IDE-codeforgemobile.pages.dev-2563eb?style=for-the-badge&logo=googlechrome&logoColor=white)](https://codeforgemobile.pages.dev)
 [![Install App](https://img.shields.io/badge/📱_INSTALL_APP_(APK)-1--Click_Install-10b981?style=for-the-badge&logo=android&logoColor=white)](https://codeforgemobile.pages.dev)
 [![GitHub Stars](https://img.shields.io/github/stars/khalidabdullahh/CodeForgeMobile?style=for-the-badge&color=f59e0b&logo=github)](https://github.com/khalidabdullahh/CodeForgeMobile)

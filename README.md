@@ -89,6 +89,30 @@ npm run build
 
 ---
 
+## 🤖 Building Android APK with Android Studio
+
+You can easily compile CodeForge Mobile into a native Android APK:
+
+```bash
+# 1. Build the web distribution
+npm run build
+
+# 2. Sync web files with the native Android project
+npx cap sync android
+
+# 3. Open project directly in Android Studio
+npx cap open android
+```
+
+In Android Studio:
+1. Wait for Gradle sync to complete.
+2. Go to **Build** → **Build Bundle(s) / APK(s)** → **Build APK(s)**.
+3. Once generated, locate the `.apk` in `android/app/build/outputs/apk/debug/app-debug.apk` and transfer/install it directly on your Android phone!
+
+*(Automated APK builds are also generated on every release via GitHub Actions and available on [GitHub Releases](https://github.com/khalidabdullahh/CodeForgeMobile/releases)).*
+
+---
+
 ## 🤝 Contributing & Security
 
 Contributions are welcome! Please follow these steps:

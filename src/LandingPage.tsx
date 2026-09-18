@@ -394,10 +394,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="install-step">
                 <span className="step-num">1</span>
                 <div>
-                  <b>Instant Android / Mobile Installation:</b>
+                  <b>Direct APK Installation (Android):</b>
                   <p>
-                    Open this page in <strong>Chrome</strong> on Android or <strong>Safari</strong> on iOS.
-                    Tap the browser menu <strong>(⋮)</strong> and select <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong>.
+                    Download the pre-compiled Android APK directly from GitHub Releases to install CodeForge Mobile on any Android device.
                   </p>
                 </div>
               </div>
@@ -405,30 +404,44 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="install-step">
                 <span className="step-num">2</span>
                 <div>
-                  <b>Offline Ready:</b>
-                  <p>Once installed, CodeForge will appear as an app icon on your phone and open in full-screen landscape mode with 0 latency.</p>
+                  <b>Instant PWA Install (No Download Needed):</b>
+                  <p>
+                    Tap the browser menu <strong>(⋮)</strong> in Chrome/Safari and select <strong>"Add to Home screen"</strong> to install as a standalone offline app.
+                  </p>
                 </div>
               </div>
 
-              <div className="modal-buttons">
-                <button
+              <div className="modal-buttons" style={{ flexDirection: 'column' }}>
+                <a
+                  href="https://github.com/khalidabdullahh/CodeForgeMobile/releases"
+                  target="_blank"
+                  rel="noreferrer"
                   className="modal-btn-primary"
-                  onClick={() => {
-                    onLaunchIde();
-                    setShowInstallModal(false);
-                  }}
+                  style={{ textDecoration: 'none' }}
                 >
-                  <Play size={15} /> Launch Instant Web IDE
-                </button>
-                <button
-                  className="modal-btn-secondary"
-                  onClick={() => {
-                    onDownloadZip();
-                    setShowInstallModal(false);
-                  }}
-                >
-                  <Download size={15} /> Download Source .ZIP
-                </button>
+                  <Download size={16} /> Download APK from GitHub Releases
+                </a>
+
+                <div className="flex gap-2 w-full">
+                  <button
+                    className="modal-btn-secondary"
+                    onClick={() => {
+                      onLaunchIde();
+                      setShowInstallModal(false);
+                    }}
+                  >
+                    <Play size={15} /> Launch Web IDE
+                  </button>
+                  <button
+                    className="modal-btn-secondary"
+                    onClick={() => {
+                      onDownloadZip();
+                      setShowInstallModal(false);
+                    }}
+                  >
+                    <Download size={15} /> Source .ZIP
+                  </button>
+                </div>
               </div>
             </div>
           </div>

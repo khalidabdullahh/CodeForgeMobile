@@ -73,7 +73,7 @@ git clone https://github.com/khalidabdullahh/CodeForgeMobile.git
 cd CodeForgeMobile
 
 # 2. Install dependencies
-npm install
+npm ci
 
 # 3. Start development server
 npm run dev
@@ -84,7 +84,23 @@ Open your browser at `http://localhost:5173`.
 ### Production Build
 
 ```bash
+npm run typecheck
 npm run build
+```
+
+### Cloudflare Pages Deployment (Web)
+
+Use these settings in Cloudflare Pages:
+
+- **Framework preset:** `Vite`
+- **Build command:** `npm run build`
+- **Build output directory:** `dist`
+- **Node install command:** `npm ci`
+
+SPA fallback is configured via `public/_redirects` and is included in `dist` during build:
+
+```txt
+/* /index.html 200
 ```
 
 ---

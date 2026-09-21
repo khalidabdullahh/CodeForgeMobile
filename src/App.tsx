@@ -738,6 +738,8 @@ function App() {
   });
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
   const liveChannelRef = useRef<BroadcastChannel | null>(null);
+  const filesRef = useRef(files);
+  filesRef.current = files;
 
   // AI State
   const [aiProvider, setAiProvider] = useState<AiProvider>(() => (localStorage.getItem('codeforge-ai-provider') as AiProvider) || 'gemini');
@@ -751,6 +753,11 @@ function App() {
   ]);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+
+  // Find & Replace
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [replaceQuery, setReplaceQuery] = useState('');
 
   const fileInput = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
@@ -788,7 +795,7 @@ function App() {
     };
   }, []);
 
-  // Handle Live Share BroadcastChannel
+  // Handle Live Share BroadcastChannel (stable: does not recreate on every file edit)
   useEffect(() => {
     if (!liveShareConnected) {
       if (liveChannelRef.current) {
@@ -806,8 +813,8 @@ function App() {
       } else if (type === 'peer-joined') {
         setConnectedPeers(prev => Array.from(new Set([...prev, sender || 'Peer'])));
         setTerminal(prev => `${prev}\n👥 [Live Share] New peer joined room "${liveShareId}"!`);
-        // Share current workspace snapshot to newly joined peer
-        channel.postMessage({ type: 'sync-snapshot', payload: files, sender: 'Host' });
+        // Share current workspace snapshot to newly joined peer (use ref to avoid stale/deps issues)
+        channel.postMessage({ type: 'sync-snapshot', payload: filesRef.current, sender: 'Host' });
       } else if (type === 'sync-snapshot' && Array.isArray(payload) && payload.length) {
         setFiles(payload);
         setTerminal(prev => `${prev}\n👥 [Live Share] Received synced workspace snapshot (${payload.length} files).`);
@@ -818,7 +825,7 @@ function App() {
       channel.close();
       liveChannelRef.current = null;
     };
-  }, [liveShareConnected, liveShareId, files]);
+  }, [liveShareConnected, liveShareId]);
 
   // Handle iframe console messages
   useEffect(() => {
@@ -1203,6 +1210,124 @@ function App() {
     }
   };
 
+  // Push entire workspace (sequential content API – good for small projects)
+  const pushAllToGitHub = async () => {
+    if (!ghToken.trim()) {
+      setGhStatusMsg('⚠️ Please enter your GitHub Personal Access Token.');
+      return;
+    }
+    const [owner, repo] = ghRepoInput.split('/');
+    if (!owner || !repo) {
+      setGhStatusMsg('⚠️ Please specify repository in format owner/repo.');
+      return;
+    }
+    setGhLoading(true);
+    setGhStatusMsg(`⏳ Pushing all ${files.length} files to GitHub...`);
+    const encodedOwner = encodeURIComponent(owner.trim());
+    const encodedRepo = encodeURIComponent(repo.trim());
+    let success = 0;
+    let failed = 0;
+    try {
+      for (const file of files) {
+        try {
+          let sha: string | undefined;
+          const encodedPath = file.path.split('/').map(encodeURIComponent).join('/');
+          const getRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${encodedPath}?ref=${encodeURIComponent(branch.trim())}`, {
+            headers: { Authorization: `token ${ghToken.trim()}`, Accept: 'application/vnd.github.v3+json' }
+          });
+          if (getRes.ok) {
+            const data = await getRes.json();
+            sha = data.sha;
+          }
+          const putRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${encodedPath}`, {
+            method: 'PUT',
+            headers: {
+              Authorization: `token ${ghToken.trim()}`,
+              Accept: 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              message: gitMessage || `Update ${file.path} via CodeForge Mobile`,
+              content: btoa(unescape(encodeURIComponent(file.content))),
+              branch: branch.trim(),
+              sha
+            })
+          });
+          if (putRes.ok) success++;
+          else failed++;
+        } catch {
+          failed++;
+        }
+      }
+      setGhStatusMsg(`✅ Pushed ${success}/${files.length} files${failed ? ` (${failed} failed)` : ''} to ${owner}/${repo}`);
+      setTerminal(prev => `${prev}\n✓ GitHub push-all: ${success} ok, ${failed} failed`);
+      setFiles(prev => prev.map(f => ({ ...f, modified: false })));
+    } catch (err: any) {
+      setGhStatusMsg(`❌ Error: ${err.message}`);
+    } finally {
+      setGhLoading(false);
+    }
+  };
+
+  // Pull files from GitHub repository (flat listing of root + common files)
+  const pullFromGitHub = async () => {
+    if (!ghToken.trim()) {
+      setGhStatusMsg('⚠️ Please enter your GitHub Personal Access Token.');
+      return;
+    }
+    const [owner, repo] = ghRepoInput.split('/');
+    if (!owner || !repo) {
+      setGhStatusMsg('⚠️ Please specify repository in format owner/repo.');
+      return;
+    }
+    setGhLoading(true);
+    setGhStatusMsg('⏳ Pulling repository contents from GitHub...');
+    try {
+      const encodedOwner = encodeURIComponent(owner.trim());
+      const encodedRepo = encodeURIComponent(repo.trim());
+      const res = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/git/trees/${encodeURIComponent(branch.trim())}?recursive=1`, {
+        headers: { Authorization: `token ${ghToken.trim()}`, Accept: 'application/vnd.github.v3+json' }
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to list tree');
+      }
+      const tree = await res.json();
+      const blobs = (tree.tree || []).filter((t: any) => t.type === 'blob' && t.path && !t.path.startsWith('.') && t.size < 500000);
+      if (!blobs.length) throw new Error('No files found in repository');
+      const normalized: FileItem[] = [];
+      // Limit to first 40 files to avoid rate limits / memory
+      for (const blob of blobs.slice(0, 40)) {
+        const contentRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${blob.path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(branch.trim())}`, {
+          headers: { Authorization: `token ${ghToken.trim()}`, Accept: 'application/vnd.github.v3+json' }
+        });
+        if (!contentRes.ok) continue;
+        const data = await contentRes.json();
+        if (data.encoding === 'base64' && data.content) {
+          const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
+          const name = blob.path.split('/').pop() || blob.path;
+          normalized.push({
+            id: crypto.randomUUID(),
+            name,
+            path: blob.path,
+            language: languageFor(name),
+            content
+          });
+        }
+      }
+      if (!normalized.length) throw new Error('Could not decode any files');
+      setFiles(normalized);
+      setOpenTabs([normalized[0].id]);
+      setActiveId(normalized[0].id);
+      setGhStatusMsg(`✅ Pulled ${normalized.length} files from ${owner}/${repo}`);
+      setTerminal(prev => `${prev}\n✓ GitHub pull: loaded ${normalized.length} files`);
+    } catch (err: any) {
+      setGhStatusMsg(`❌ Error: ${err.message}`);
+    } finally {
+      setGhLoading(false);
+    }
+  };
+
   // Starter Template Apply
   const applyTemplate = (template: ProjectTemplate) => {
     setFiles(template.files);
@@ -1230,9 +1355,41 @@ function App() {
     }
   };
 
-  const importProject = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const importProject = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.target.files?.[0];
     if (!input) return;
+    const isZip = input.name.toLowerCase().endsWith('.zip') || input.type === 'application/zip' || input.type === 'application/x-zip-compressed';
+
+    if (isZip) {
+      try {
+        setTerminal(prev => `${prev}\n⏳ Importing ZIP archive...`);
+        const zip = await JSZip.loadAsync(input);
+        const normalized: FileItem[] = [];
+        const entries = Object.keys(zip.files).filter(p => !zip.files[p].dir && !p.startsWith('__MACOSX') && !p.includes('/.'));
+        for (const path of entries) {
+          const content = await zip.files[path].async('string');
+          const name = path.split('/').pop() || path;
+          normalized.push({
+            id: crypto.randomUUID(),
+            name,
+            path,
+            language: languageFor(name),
+            content
+          });
+        }
+        if (!normalized.length) throw new Error('empty zip');
+        setFiles(normalized);
+        setOpenTabs([normalized[0].id]);
+        setActiveId(normalized[0].id);
+        setTerminal(prev => `${prev}\n✓ Imported ${normalized.length} files from ZIP`);
+      } catch (err: any) {
+        setTerminal(prev => `${prev}\n✗ Failed to import ZIP: ${err.message || 'invalid archive'}`);
+      }
+      event.target.value = '';
+      return;
+    }
+
+    // JSON project format
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -1251,7 +1408,7 @@ function App() {
         setBranch(parsed.branch || 'main');
         setTerminal(prev => `${prev}\n✓ Imported ${normalized.length} files`);
       } catch {
-        setTerminal(prev => `${prev}\n✗ Invalid CodeForge project file`);
+        setTerminal(prev => `${prev}\n✗ Invalid CodeForge project file (use .json or .zip)`);
       }
     };
     reader.readAsText(input);
@@ -1303,10 +1460,38 @@ function App() {
     setTerminal(prev => `${prev}\n✓ Formatter applied to ${active.name}`);
   };
 
+  const doFindReplace = (replaceAll = false) => {
+    if (!active || !findQuery) return;
+    const editor = editorRef.current;
+    if (editor && !replaceAll) {
+      // Find next in Monaco
+      const model = editor.getModel();
+      if (model) {
+        const matches = model.findMatches(findQuery, true, false, false, null, true);
+        if (matches.length) {
+          editor.setSelection(matches[0].range);
+          editor.revealRangeInCenter(matches[0].range);
+        } else {
+          setTerminal(prev => `${prev}\n🔍 No matches for "${findQuery}"`);
+        }
+      }
+      return;
+    }
+    // Replace all
+    if (replaceAll && findQuery) {
+      const newContent = active.content.split(findQuery).join(replaceQuery);
+      const count = active.content.split(findQuery).length - 1;
+      updateContent(newContent);
+      setTerminal(prev => `${prev}\n✓ Replaced ${count} occurrence(s) of "${findQuery}"`);
+      setShowFindReplace(false);
+    }
+  };
+
   const executePalette = (action: string) => {
     setPalette(false);
     if (action === 'new') createFile();
     if (action === 'terminal') setPanel(v => !v);
+    if (action === 'find') setShowFindReplace(true);
     if (action === 'preview') {
       setView('preview');
       setPreviewKey(k => k + 1);
@@ -1413,15 +1598,23 @@ function App() {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        executePalette('save');
+        // Inline save to avoid stale closure / missing deps
+        setFiles(prev => prev.map(f => (f.id === activeId ? { ...f, modified: false } : f)));
+        setTerminal(prev => `${prev}\n✓ Saved (⌘S)`);
       } else if (mod && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         setPalette(true);
-      } else if (e.key === 'Escape') setPalette(false);
+      } else if (mod && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setShowFindReplace(true);
+      } else if (e.key === 'Escape') {
+        setPalette(false);
+        setShowFindReplace(false);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  });
+  }, [activeId]);
 
   // If user is on landing page view
   if (!inIdeMode) {
@@ -1434,9 +1627,13 @@ function App() {
     );
   }
 
-  const html = files.find(f => f.name === 'index.html')?.content || '';
-  const css = files.find(f => f.name === 'style.css')?.content || '';
-  const js = files.find(f => f.name === 'script.js')?.content || '';
+  const htmlFile = files.find(f => f.name === 'index.html' || f.path.endsWith('index.html'));
+  const html = htmlFile?.content || '<h1>No index.html found. Create one to preview.</h1>';
+  // Collect all CSS (prefer style.css first) and all JS (prefer script.js)
+  const cssFiles = files.filter(f => f.language === 'css' || f.name.endsWith('.css'));
+  const jsFiles = files.filter(f => (f.language === 'javascript' || f.name.endsWith('.js')) && !f.name.endsWith('.json'));
+  const css = cssFiles.map(f => `/* === ${f.path} === */\n${f.content}`).join('\n\n');
+  const js = jsFiles.map(f => `/* === ${f.path} === */\n${f.content}`).join('\n\n');
 
   const preview = `<!doctype html>
 <html>
@@ -1463,7 +1660,7 @@ function App() {
   </script>
 </head>
 <body>
-  ${html.replace(/<head>[\s\S]*?<\/head>/i, '').replace(/<script[\s\S]*?<\/script>/gi, '')}
+  ${html.replace(/<head>[\s\S]*?<\/head>/i, '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<link[^>]*>/gi, '')}
   <script>${js}</script>
 </body>
 </html>`;
@@ -1892,11 +2089,22 @@ function App() {
                 />
               </div>
 
-              {ghStatusMsg && <div className="status-note" style={{ color: ghStatusMsg.startsWith('✅') ? '#4ade80' : '#f87171' }}>{ghStatusMsg}</div>}
+              {ghStatusMsg && <div className="status-note" style={{ color: ghStatusMsg.startsWith('✅') ? '#4ade80' : ghStatusMsg.startsWith('⏳') ? '#60a5fa' : '#f87171' }}>{ghStatusMsg}</div>}
 
-              <button className="primary-wide" disabled={ghLoading} onClick={pushFileToGitHub}>
-                <Cloud size={16} /> {ghLoading ? 'Pushing to GitHub...' : `Push ${active?.name || 'File'} to GitHub`}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button className="primary-wide" disabled={ghLoading} onClick={pushFileToGitHub}>
+                  <Cloud size={16} /> {ghLoading ? 'Working...' : `Push Current File (${active?.name || 'File'})`}
+                </button>
+                <button className="primary-wide secondary-theme-btn" disabled={ghLoading} onClick={pushAllToGitHub}>
+                  <Upload size={16} /> Push All {files.length} Files
+                </button>
+                <button className="primary-wide secondary-theme-btn" disabled={ghLoading} onClick={pullFromGitHub}>
+                  <Download size={16} /> Pull from GitHub (Load Repo)
+                </button>
+              </div>
+              <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
+                Tip: Create a fine-grained PAT with Contents: Read & Write. Pull fetches up to 40 files (recursive tree).
+              </p>
             </section>
           )}
 
@@ -2333,6 +2541,41 @@ function App() {
         </div>
       </footer>
 
+      {/* Find & Replace Modal */}
+      {showFindReplace && (
+        <div className="palette-backdrop" onMouseDown={() => setShowFindReplace(false)}>
+          <div className="palette find-replace-panel" onMouseDown={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="view-head" style={{ marginBottom: 12 }}>
+              <b>Find & Replace</b>
+              <button className="pill-btn" onClick={() => setShowFindReplace(false)}><X size={14} /></button>
+            </div>
+            <div className="setting-input-block">
+              <label>Find</label>
+              <input
+                autoFocus
+                value={findQuery}
+                onChange={e => setFindQuery(e.target.value)}
+                placeholder="Search text..."
+                onKeyDown={e => e.key === 'Enter' && doFindReplace(false)}
+              />
+            </div>
+            <div className="setting-input-block">
+              <label>Replace with</label>
+              <input
+                value={replaceQuery}
+                onChange={e => setReplaceQuery(e.target.value)}
+                placeholder="Replacement text..."
+                onKeyDown={e => e.key === 'Enter' && doFindReplace(true)}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button className="primary-wide" onClick={() => doFindReplace(false)}>Find Next</button>
+              <button className="primary-wide secondary-theme-btn" onClick={() => doFindReplace(true)}>Replace All</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Command Palette Modal */}
       {palette && (
         <div className="palette-backdrop" onMouseDown={() => setPalette(false)}>
@@ -2361,6 +2604,9 @@ function App() {
             </button>
             <button onClick={() => executePalette('format')}>
               <Wand2 size={15} /> Format Code
+            </button>
+            <button onClick={() => executePalette('find')}>
+              <Search size={15} /> Find & Replace <kbd>⌘F</kbd>
             </button>
             <button onClick={() => executePalette('ai')}>
               <Bot size={15} /> Open AI Copilot

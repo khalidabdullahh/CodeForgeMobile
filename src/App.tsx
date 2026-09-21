@@ -1629,6 +1629,15 @@ function App() {
 
   const htmlFile = files.find(f => f.name === 'index.html' || f.path.endsWith('index.html'));
   const html = htmlFile?.content || '<h1>No index.html found. Create one to preview.</h1>';
+  const sanitizePreviewHtml = (rawHtml: string) => {
+    try {
+      const parsed = new DOMParser().parseFromString(rawHtml, 'text/html');
+      parsed.querySelectorAll('script, link').forEach(node => node.remove());
+      return parsed.body.innerHTML;
+    } catch {
+      return rawHtml;
+    }
+  };
   // Collect all CSS (prefer style.css first) and all JS (prefer script.js)
   const cssFiles = files.filter(f => f.language === 'css' || f.name.endsWith('.css'));
   const jsFiles = files.filter(f => (f.language === 'javascript' || f.name.endsWith('.js')) && !f.name.endsWith('.json'));
@@ -1660,7 +1669,7 @@ function App() {
   </script>
 </head>
 <body>
-  ${html.replace(/<head>[\s\S]*?<\/head>/i, '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<link[^>]*>/gi, '')}
+  ${sanitizePreviewHtml(html)}
   <script>${js}</script>
 </body>
 </html>`;

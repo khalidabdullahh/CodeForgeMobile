@@ -161,6 +161,70 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => observer.disconnect();
   }, []);
 
+  // Particle Trail Mouse Animation (Matching CV Builder & CodeForge)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Only activate on devices with fine pointer (mouse / trackpad)
+    const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+    if (!hasFinePointer) return;
+
+    let lastCreated = 0;
+    const activeDots = new Set<HTMLDivElement>();
+
+    const handleTrailingMouseMove = (e: MouseEvent) => {
+      const now = Date.now();
+      // Throttle to ~18-20ms for smooth 60fps performance
+      if (now - lastCreated < 20) return;
+      lastCreated = now;
+
+      const dot = document.createElement('div');
+      dot.className = 'cursor-trail-dot';
+      dot.style.position = 'fixed';
+      dot.style.left = `${e.clientX}px`;
+      dot.style.top = `${e.clientY}px`;
+      dot.style.width = '7px';
+      dot.style.height = '7px';
+      dot.style.marginLeft = '-3.5px';
+      dot.style.marginTop = '-3.5px';
+      dot.style.background = 'linear-gradient(135deg, #3b82f6, #6366f1, #06b6d4)';
+      dot.style.boxShadow = '0 0 10px rgba(59, 130, 246, 0.85), 0 0 20px rgba(99, 102, 241, 0.45)';
+      dot.style.borderRadius = '50%';
+      dot.style.opacity = '0.9';
+      dot.style.transform = 'scale(1)';
+      dot.style.transition = 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+      dot.style.pointerEvents = 'none';
+      dot.style.zIndex = '99999';
+
+      document.body.appendChild(dot);
+      activeDots.add(dot);
+
+      setTimeout(() => {
+        dot.style.opacity = '0';
+        dot.style.transform = 'scale(0.2)';
+        dot.style.width = '0px';
+        dot.style.height = '0px';
+      }, 40);
+
+      setTimeout(() => {
+        if (dot && dot.parentNode) {
+          dot.remove();
+        }
+        activeDots.delete(dot);
+      }, 550);
+    };
+
+    document.addEventListener('mousemove', handleTrailingMouseMove, { passive: true });
+
+    return () => {
+      document.removeEventListener('mousemove', handleTrailingMouseMove);
+      activeDots.forEach(d => {
+        if (d && d.parentNode) d.remove();
+      });
+      activeDots.clear();
+    };
+  }, []);
+
   // Typewriter effect
   useEffect(() => {
     const current = TYPEWRITER_WORDS[wordIndex];

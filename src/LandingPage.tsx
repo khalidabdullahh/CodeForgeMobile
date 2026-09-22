@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   Bot,
+  ChevronUp,
   Code2,
   Columns,
   Download,
@@ -92,6 +93,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [snippetIndex, setSnippetIndex] = useState(0);
   const [visibleLines, setVisibleLines] = useState(0);
 
+  // Mouse Spotlight and 3D Tilt State
+  const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
+  const [mockupTilt, setMockupTilt] = useState({ rx: 0, ry: 0 });
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mockupRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handler = (e: any) => {
       e.preventDefault();
@@ -101,7 +111,57 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  // Typewriter effect (like codeforges.pages.dev)
+  // Scroll Progress & Back to top tracker
+  useEffect(() => {
+    const handleScroll = () => {
+      const el = containerRef.current;
+      if (el) {
+        const total = el.scrollHeight - el.clientHeight;
+        const current = el.scrollTop;
+        const pct = total > 0 ? (current / total) * 100 : 0;
+        setScrollProgress(pct);
+        setShowBackToTop(current > 320);
+      } else {
+        const total = document.documentElement.scrollHeight - window.innerHeight;
+        const current = window.scrollY;
+        const pct = total > 0 ? (current / total) * 100 : 0;
+        setScrollProgress(pct);
+        setShowBackToTop(current > 320);
+      }
+    };
+
+    if (containerRef.current) {
+      containerRef.current.addEventListener('scroll', handleScroll, { passive: true });
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      if (containerRef.current) {
+        containerRef.current.removeEventListener('scroll', handleScroll);
+      }
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Intersection Observer for Reveal-on-Scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-revealed');
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    const revealElements = document.querySelectorAll('.reveal-on-scroll');
+    revealElements.forEach(el => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Typewriter effect
   useEffect(() => {
     const current = TYPEWRITER_WORDS[wordIndex];
     let timeout: ReturnType<typeof setTimeout>;
@@ -147,6 +207,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     };
   }, [snippetIndex]);
 
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMockupMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!mockupRef.current) return;
+    const rect = mockupRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const rx = ((y / rect.height) - 0.5) * -12;
+    const ry = ((x / rect.width) - 0.5) * 12;
+    setMockupTilt({ rx, ry });
+  };
+
+  const handleMockupMouseLeave = () => {
+    setMockupTilt({ rx: 0, ry: 0 });
+  };
+
+  const scrollToTop = () => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -160,7 +245,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const currentSnippet = MOCK_SNIPPETS[snippetIndex];
 
   return (
-    <div className="landing-container">
+    <div className="landing-container" ref={containerRef} onMouseMove={handleMouseMove}>
+      {/* Scroll Progress Bar */}
+      <div className="scroll-progress-bar" style={{ width: `${scrollProgress}%` }} />
+
+      {/* Mouse Spotlight Glow */}
+      <div
+        className="mouse-spotlight"
+        style={{
+          left: `${mousePos.x}px`,
+          top: `${mousePos.y}px`
+        }}
+      />
+
+      {/* Floating Ambient Particles in Background */}
+      <div className="floating-particles-container" aria-hidden="true">
+        <span className="floating-particle p-1">{'<code />'}</span>
+        <span className="floating-particle p-2">{'{ state }'}</span>
+        <span className="floating-particle p-3">fn() =&gt;</span>
+        <span className="floating-particle p-4">const dev = true;</span>
+        <span className="floating-particle p-5">01011001</span>
+        <span className="floating-particle p-6">async / await</span>
+      </div>
+
       {/* Navbar */}
       <nav className="landing-nav">
         <div className="nav-content">
@@ -254,8 +361,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <span className="lang-pill more">+ Markdown, JSON, TS…</span>
         </div>
 
-        {/* Hero Interactive App Mockup Frame */}
-        <div className="hero-mockup-wrapper anim-fade-up delay-5">
+        {/* Hero Interactive App Mockup Frame with 3D Tilt */}
+        <div
+          className="hero-mockup-wrapper anim-fade-up delay-5 tilt-card-3d"
+          ref={mockupRef}
+          onMouseMove={handleMockupMouseMove}
+          onMouseLeave={handleMockupMouseLeave}
+          style={{
+            transform: `perspective(1000px) rotateX(${mockupTilt.rx}deg) rotateY(${mockupTilt.ry}deg)`
+          }}
+        >
           <div className="mockup-header">
             <div className="mockup-dots">
               <span className="dot red" />
@@ -320,7 +435,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </header>
 
       {/* Landscape Feature Highlight */}
-      <section id="landscape" className="feature-highlight-section">
+      <section id="landscape" className="feature-highlight-section reveal-on-scroll">
         <div className="section-header">
           <div className="section-pill">
             <Smartphone size={14} />
@@ -361,7 +476,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Features Grid */}
-      <section id="features" className="features-section">
+      <section id="features" className="features-section reveal-on-scroll">
         <div className="section-header">
           <div className="section-pill">
             <Zap size={14} />
@@ -431,7 +546,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Download & Installation Section */}
-      <section id="download" className="download-section">
+      <section id="download" className="download-section reveal-on-scroll">
         <div className="download-card">
           <h2>Get CodeForge Mobile Today</h2>
           <p>Choose how you want to run or build CodeForge on your devices.</p>
@@ -468,7 +583,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Open Source Community Section */}
-      <section id="community" className="support-section">
+      <section id="community" className="support-section reveal-on-scroll">
         <div className="coffee-container">
           <div
             className="coffee-icon-wrap"
@@ -530,6 +645,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </div>
       </footer>
+
+      {/* Floating Back to Top Button */}
+      {showBackToTop && (
+        <button
+          className="back-to-top-btn pulse-glow"
+          onClick={scrollToTop}
+          aria-label="Scroll to top"
+          title="Back to Top"
+        >
+          <ChevronUp size={20} />
+        </button>
+      )}
 
       {/* 1-Click Install Modal */}
       {showInstallModal && (

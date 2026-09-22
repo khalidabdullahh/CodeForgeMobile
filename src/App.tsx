@@ -618,21 +618,46 @@ function languageFor(name: string) {
   return (
     ({
       js: 'javascript',
+      mjs: 'javascript',
+      cjs: 'javascript',
       jsx: 'javascript',
       ts: 'typescript',
       tsx: 'typescript',
       json: 'json',
       css: 'css',
+      scss: 'scss',
+      less: 'less',
       html: 'html',
+      htm: 'html',
       md: 'markdown',
+      markdown: 'markdown',
       py: 'python',
+      pyw: 'python',
+      c: 'c',
+      h: 'c',
+      cpp: 'cpp',
+      cc: 'cpp',
+      cxx: 'cpp',
+      hpp: 'cpp',
       java: 'java',
       kt: 'kotlin',
+      kts: 'kotlin',
+      rs: 'rust',
+      go: 'go',
+      php: 'php',
+      rb: 'ruby',
+      cs: 'csharp',
+      swift: 'swift',
+      dart: 'dart',
       xml: 'xml',
+      svg: 'xml',
       yml: 'yaml',
       yaml: 'yaml',
       sh: 'shell',
-      sql: 'sql'
+      bash: 'shell',
+      zsh: 'shell',
+      sql: 'sql',
+      txt: 'plaintext'
     } as Record<string, string>)[ext || ''] || 'plaintext'
   );
 }
@@ -687,7 +712,6 @@ function App() {
   const [previewKey, setPreviewKey] = useState(0);
   const [splitPreview, setSplitPreview] = useState(false);
   const [palette, setPalette] = useState(false);
-  const [newName, setNewName] = useState('');
   const [renameId, setRenameId] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem('codeforge-font') || 13));
   const [wordWrap, setWordWrap] = useState(true);
@@ -759,7 +783,17 @@ function App() {
   const [findQuery, setFindQuery] = useState('');
   const [replaceQuery, setReplaceQuery] = useState('');
 
-  const fileInput = useRef<HTMLInputElement>(null);
+  // New File Modal
+  const [showNewFileModal, setShowNewFileModal] = useState(false);
+  const [newFileInputValue, setNewFileInputValue] = useState('');
+
+  // Import Project Modal
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const multiFileInputRef = useRef<HTMLInputElement>(null);
+  const zipFileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
 
@@ -948,12 +982,61 @@ function App() {
     if (activeId === id) setActiveId(next[next.length - 1] || files[0]?.id || '');
   };
 
-  const createFile = () => {
-    const name = newName.trim() || `untitled-${files.length + 1}.js`;
-    const file: FileItem = { id: crypto.randomUUID(), name, path: name, language: languageFor(name), content: `// ${name}\n` };
+  const openCreateFileDialog = () => {
+    setNewFileInputValue('');
+    setShowNewFileModal(true);
+  };
+
+  const handleCreateFileSubmit = (customName?: string) => {
+    let rawName = (customName || newFileInputValue).trim();
+    if (!rawName) {
+      rawName = `untitled-${files.length + 1}.js`;
+    }
+
+    // Auto-detect extension if none provided
+    if (!rawName.includes('.')) {
+      rawName = `${rawName}.js`;
+    }
+
+    const lang = languageFor(rawName);
+    const baseName = rawName.split('/').pop() || rawName;
+    const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
+    let initialContent = `// ${rawName}\n`;
+
+    if (lang === 'python') {
+      initialContent = `# ${rawName}\n\ndef main():\n    print("Hello from ${rawName}!")\n\nif __name__ == "__main__":\n    main()\n`;
+    } else if (lang === 'html') {
+      initialContent = `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${baseName}</title>\n</head>\n<body>\n  <h1>${baseName}</h1>\n  <p>Created in CodeForge Mobile</p>\n</body>\n</html>\n`;
+    } else if (lang === 'css') {
+      initialContent = `/* ${rawName} */\nbody {\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n}\n`;
+    } else if (lang === 'cpp') {
+      initialContent = `// ${rawName}\n#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello from ${rawName}!" << endl;\n    return 0;\n}\n`;
+    } else if (lang === 'c') {
+      initialContent = `// ${rawName}\n#include <stdio.h>\n\nint main() {\n    printf("Hello from ${rawName}!\\n");\n    return 0;\n}\n`;
+    } else if (lang === 'java') {
+      const className = nameWithoutExt.charAt(0).toUpperCase() + nameWithoutExt.slice(1).replace(/[^a-zA-Z0-9]/g, '');
+      initialContent = `// ${rawName}\npublic class ${className || 'Main'} {\n    public static void main(String[] args) {\n        System.out.println("Hello from ${rawName}!");\n    }\n}\n`;
+    } else if (lang === 'json') {
+      initialContent = `{\n  "name": "${baseName}"\n}\n`;
+    } else if (lang === 'markdown') {
+      initialContent = `# ${baseName}\n\nWelcome to your new document.\n`;
+    } else if (lang === 'typescript') {
+      initialContent = `// ${rawName}\nexport const message: string = "Hello from TypeScript!";\nconsole.log(message);\n`;
+    }
+
+    const file: FileItem = {
+      id: crypto.randomUUID(),
+      name: baseName,
+      path: rawName,
+      language: lang,
+      content: initialContent
+    };
+
     setFiles(prev => [...prev, file]);
-    setNewName('');
+    setShowNewFileModal(false);
+    setNewFileInputValue('');
     openFile(file.id);
+    setTerminal(prev => `${prev}\n✓ Created ${file.path} (${lang})`);
   };
 
   const deleteFile = (id: string) => {
@@ -1355,63 +1438,156 @@ function App() {
     }
   };
 
-  const importProject = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const input = event.target.files?.[0];
-    if (!input) return;
-    const isZip = input.name.toLowerCase().endsWith('.zip') || input.type === 'application/zip' || input.type === 'application/x-zip-compressed';
-
-    if (isZip) {
-      try {
-        setTerminal(prev => `${prev}\n⏳ Importing ZIP archive...`);
-        const zip = await JSZip.loadAsync(input);
-        const normalized: FileItem[] = [];
-        const entries = Object.keys(zip.files).filter(p => !zip.files[p].dir && !p.startsWith('__MACOSX') && !p.includes('/.'));
-        for (const path of entries) {
-          const content = await zip.files[path].async('string');
-          const name = path.split('/').pop() || path;
-          normalized.push({
-            id: crypto.randomUUID(),
-            name,
-            path,
-            language: languageFor(name),
-            content
-          });
-        }
-        if (!normalized.length) throw new Error('empty zip');
-        setFiles(normalized);
-        setOpenTabs([normalized[0].id]);
-        setActiveId(normalized[0].id);
-        setTerminal(prev => `${prev}\n✓ Imported ${normalized.length} files from ZIP`);
-      } catch (err: any) {
-        setTerminal(prev => `${prev}\n✗ Failed to import ZIP: ${err.message || 'invalid archive'}`);
-      }
-      event.target.value = '';
+  const processImportedFiles = (items: FileItem[], sourceName?: string) => {
+    if (!items.length) {
+      setTerminal(prev => `${prev}\n⚠ No readable files found in import.`);
       return;
     }
+    setFiles(prev => {
+      const incomingPaths = new Set(items.map(f => f.path));
+      const kept = prev.filter(f => !incomingPaths.has(f.path));
+      return [...kept, ...items];
+    });
+    setOpenTabs(prev => Array.from(new Set([...prev, items[0].id])));
+    setActiveId(items[0].id);
+    setView('editor');
+    setShowImportModal(false);
+    setTerminal(prev => `${prev}\n✓ Successfully imported ${items.length} file(s)${sourceName ? ` from ${sourceName}` : ''}`);
+  };
 
-    // JSON project format
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(String(reader.result));
-        if (!Array.isArray(parsed.files) || !parsed.files.length) throw new Error('invalid');
-        const normalized = parsed.files.map((f: Partial<FileItem>, i: number) => ({
-          id: f.id || crypto.randomUUID(),
-          name: f.name || `file-${i + 1}.txt`,
-          path: f.path || f.name || `file-${i + 1}.txt`,
-          language: f.language || languageFor(f.name || ''),
-          content: f.content || ''
-        }));
-        setFiles(normalized);
-        setOpenTabs([normalized[0].id]);
-        setActiveId(normalized[0].id);
-        setBranch(parsed.branch || 'main');
-        setTerminal(prev => `${prev}\n✓ Imported ${normalized.length} files`);
-      } catch {
-        setTerminal(prev => `${prev}\n✗ Invalid CodeForge project file (use .json or .zip)`);
+  const handleFolderUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = event.target.files;
+    if (!fileList || !fileList.length) return;
+
+    setTerminal(prev => `${prev}\n⏳ Reading folder contents...`);
+    const newItems: FileItem[] = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const relPath = file.webkitRelativePath || file.name;
+
+      if (
+        relPath.includes('/.git/') ||
+        relPath.includes('/node_modules/') ||
+        relPath.includes('/.DS_Store') ||
+        relPath.includes('__MACOSX') ||
+        relPath.endsWith('.DS_Store')
+      ) {
+        continue;
       }
-    };
-    reader.readAsText(input);
+
+      try {
+        const text = await file.text();
+        const fileName = file.name || relPath.split('/').pop() || relPath;
+        newItems.push({
+          id: crypto.randomUUID(),
+          name: fileName,
+          path: relPath,
+          language: languageFor(fileName),
+          content: text
+        });
+      } catch (e) {
+        console.warn('Could not read file:', relPath, e);
+      }
+    }
+
+    const folderName = fileList[0]?.webkitRelativePath?.split('/')[0] || 'folder';
+    processImportedFiles(newItems, `folder "${folderName}"`);
+    event.target.value = '';
+  };
+
+  const handleMultiFilesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = event.target.files;
+    if (!fileList || !fileList.length) return;
+
+    setTerminal(prev => `${prev}\n⏳ Reading selected files...`);
+    const newItems: FileItem[] = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      if (file.name.toLowerCase().endsWith('.zip') || file.type.includes('zip')) {
+        try {
+          const zip = await JSZip.loadAsync(file);
+          const entries = Object.keys(zip.files).filter(p => !zip.files[p].dir && !p.startsWith('__MACOSX') && !p.includes('/.') && !p.endsWith('.DS_Store'));
+          for (const path of entries) {
+            const content = await zip.files[path].async('string');
+            const name = path.split('/').pop() || path;
+            newItems.push({
+              id: crypto.randomUUID(),
+              name,
+              path,
+              language: languageFor(name),
+              content
+            });
+          }
+        } catch (err: any) {
+          setTerminal(prev => `${prev}\n✗ Failed to parse ${file.name}: ${err.message}`);
+        }
+        continue;
+      }
+
+      if (file.name.toLowerCase().endsWith('.json') || file.name.toLowerCase().endsWith('.codeforge')) {
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed.files) && parsed.files.length) {
+            parsed.files.forEach((f: any, idx: number) => {
+              newItems.push({
+                id: f.id || crypto.randomUUID(),
+                name: f.name || `file-${idx + 1}.txt`,
+                path: f.path || f.name || `file-${idx + 1}.txt`,
+                language: f.language || languageFor(f.name || ''),
+                content: f.content || ''
+              });
+            });
+            continue;
+          }
+        } catch {}
+      }
+
+      try {
+        const text = await file.text();
+        const fileName = file.name;
+        newItems.push({
+          id: crypto.randomUUID(),
+          name: fileName,
+          path: fileName,
+          language: languageFor(fileName),
+          content: text
+        });
+      } catch (e) {
+        console.warn('Could not read file:', file.name, e);
+      }
+    }
+
+    processImportedFiles(newItems, `${fileList.length} files`);
+    event.target.value = '';
+  };
+
+  const handleZipUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.target.files?.[0];
+    if (!input) return;
+    try {
+      setTerminal(prev => `${prev}\n⏳ Extracting ZIP archive...`);
+      const zip = await JSZip.loadAsync(input);
+      const normalized: FileItem[] = [];
+      const entries = Object.keys(zip.files).filter(p => !zip.files[p].dir && !p.startsWith('__MACOSX') && !p.includes('/.') && !p.endsWith('.DS_Store'));
+      for (const path of entries) {
+        const content = await zip.files[path].async('string');
+        const name = path.split('/').pop() || path;
+        normalized.push({
+          id: crypto.randomUUID(),
+          name,
+          path,
+          language: languageFor(name),
+          content
+        });
+      }
+      if (!normalized.length) throw new Error('No readable files found in archive');
+      processImportedFiles(normalized, `ZIP "${input.name}"`);
+    } catch (err: any) {
+      setTerminal(prev => `${prev}\n✗ Failed to import ZIP: ${err.message || 'invalid archive'}`);
+    }
     event.target.value = '';
   };
 
@@ -1489,7 +1665,7 @@ function App() {
 
   const executePalette = (action: string) => {
     setPalette(false);
-    if (action === 'new') createFile();
+    if (action === 'new') openCreateFileDialog();
     if (action === 'terminal') setPanel(v => !v);
     if (action === 'find') setShowFindReplace(true);
     if (action === 'preview') {
@@ -1746,10 +1922,32 @@ function App() {
           <button className="icon-btn" title="Export ZIP" onClick={exportProjectZip}>
             <Download size={18} />
           </button>
-          <button className="icon-btn" title="Import" onClick={() => fileInput.current?.click()}>
+          <button className="icon-btn" title="Import Project / Files" onClick={() => setShowImportModal(true)}>
             <Upload size={18} />
           </button>
-          <input ref={fileInput} type="file" accept="application/json,.codeforge,.zip" hidden onChange={importProject} />
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            {...({ webkitdirectory: '', directory: '' } as any)}
+            hidden
+            onChange={handleFolderUpload}
+          />
+          <input
+            ref={multiFileInputRef}
+            type="file"
+            multiple
+            accept="*/*"
+            hidden
+            onChange={handleMultiFilesUpload}
+          />
+          <input
+            ref={zipFileInputRef}
+            type="file"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            hidden
+            onChange={handleZipUpload}
+          />
         </div>
       </header>
 
@@ -1761,13 +1959,13 @@ function App() {
             <div className="sidebar-head">
               <span>EXPLORER</span>
               <div className="explorer-actions">
-                <button className="mini-btn" title="New file" onClick={createFile}>
+                <button className="mini-btn" title="New file" onClick={openCreateFileDialog}>
                   <FilePlus2 size={15} />
                 </button>
                 <button
                   className="mini-btn"
-                  title="New folder"
-                  onClick={() => setTerminal(prev => `${prev}\n✓ Folder path supported: prefix filename with folder name e.g. src/App.tsx`)}
+                  title="New folder / file"
+                  onClick={openCreateFileDialog}
                 >
                   <FolderPlus size={15} />
                 </button>
@@ -1877,7 +2075,7 @@ function App() {
               <button onClick={exportProjectZip}>
                 <Archive size={15} /> Export as ZIP
               </button>
-              <button onClick={() => fileInput.current?.click()}>
+              <button onClick={() => { setShowImportModal(true); setSidebar(false); }}>
                 <Upload size={15} /> Import Project
               </button>
               <button onClick={exportAndroidPackage}>
@@ -1922,7 +2120,7 @@ function App() {
                 </button>
               );
             })}
-            <button className="new-tab" title="New file" onClick={createFile}>
+            <button className="new-tab" title="New file" onClick={openCreateFileDialog}>
               <Plus size={17} />
             </button>
           </div>
@@ -2585,6 +2783,187 @@ function App() {
         </div>
       )}
 
+      {/* Create New File Modal */}
+      {showNewFileModal && (
+        <div className="palette-backdrop" onMouseDown={() => setShowNewFileModal(false)}>
+          <div className="palette modal-panel" onMouseDown={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="view-head" style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FilePlus2 size={18} color="#3b82f6" />
+                <b>Create New File</b>
+              </div>
+              <button className="pill-btn" onClick={() => setShowNewFileModal(false)}><X size={14} /></button>
+            </div>
+
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                handleCreateFileSubmit();
+              }}
+            >
+              <div className="setting-input-block" style={{ marginBottom: 12 }}>
+                <label>File Name with Extension</label>
+                <input
+                  autoFocus
+                  value={newFileInputValue}
+                  onChange={e => setNewFileInputValue(e.target.value)}
+                  placeholder="e.g. main.py, index.html, script.js, style.css, App.tsx"
+                />
+              </div>
+
+              {/* Real-time Language Detection Preview */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+                <span>Language Mode:</span>
+                <span className="lang-preview-badge">
+                  {newFileInputValue.trim() ? languageFor(newFileInputValue) : 'javascript (default)'}
+                </span>
+              </div>
+
+              {/* Quick Extension Presets */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Quick Language Extensions:</div>
+                <div className="quick-ext-chips">
+                  {[
+                    { ext: '.py', name: 'Python' },
+                    { ext: '.js', name: 'JavaScript' },
+                    { ext: '.ts', name: 'TypeScript' },
+                    { ext: '.html', name: 'HTML5' },
+                    { ext: '.css', name: 'CSS3' },
+                    { ext: '.cpp', name: 'C++' },
+                    { ext: '.c', name: 'C' },
+                    { ext: '.java', name: 'Java' },
+                    { ext: '.json', name: 'JSON' },
+                    { ext: '.md', name: 'Markdown' },
+                    { ext: '.sql', name: 'SQL' },
+                  ].map(chip => (
+                    <button
+                      key={chip.ext}
+                      type="button"
+                      className="ext-chip"
+                      onClick={() => {
+                        const current = newFileInputValue.trim();
+                        if (!current) {
+                          setNewFileInputValue(`main${chip.ext}`);
+                        } else if (current.includes('.')) {
+                          const base = current.replace(/\.[^/.]+$/, '');
+                          setNewFileInputValue(`${base}${chip.ext}`);
+                        } else {
+                          setNewFileInputValue(`${current}${chip.ext}`);
+                        }
+                      }}
+                    >
+                      {chip.ext} <small>({chip.name})</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+                <button
+                  type="button"
+                  className="pill-btn"
+                  onClick={() => setShowNewFileModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="primary-wide"
+                  style={{ width: 'auto', padding: '8px 22px' }}
+                >
+                  Create File
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Universal Import Project & Files Modal */}
+      {showImportModal && (
+        <div className="palette-backdrop" onMouseDown={() => setShowImportModal(false)}>
+          <div
+            className="palette modal-panel"
+            onMouseDown={e => e.stopPropagation()}
+            style={{ maxWidth: 540 }}
+            onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={async e => {
+              e.preventDefault();
+              setIsDragOver(false);
+              if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const fakeEvent = { target: { files: e.dataTransfer.files, value: '' } } as any;
+                handleMultiFilesUpload(fakeEvent);
+              }
+            }}
+          >
+            <div className="view-head" style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Upload size={18} color="#3b82f6" />
+                <b>Import Project & Code Files</b>
+              </div>
+              <button className="pill-btn" onClick={() => setShowImportModal(false)}><X size={14} /></button>
+            </div>
+
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+              Choose how you want to load files or projects into your workspace:
+            </p>
+
+            <div className="import-grid">
+              {/* Option 1: Folder / Directory */}
+              <div
+                className="import-card"
+                onClick={() => folderInputRef.current?.click()}
+              >
+                <div className="import-icon-badge folder">
+                  <FolderOpen size={22} />
+                </div>
+                <div className="import-card-text">
+                  <h4>Import Entire Folder</h4>
+                  <p>Upload a whole directory with all its files & folders (e.g. conditional_statement, react-app, etc.).</p>
+                </div>
+                <button className="pill-btn highlight-btn" type="button">Select Folder</button>
+              </div>
+
+              {/* Option 2: Multiple Files */}
+              <div
+                className="import-card"
+                onClick={() => multiFileInputRef.current?.click()}
+              >
+                <div className="import-icon-badge file">
+                  <FileCode2 size={22} />
+                </div>
+                <div className="import-card-text">
+                  <h4>Import Code Files</h4>
+                  <p>Select any code files (.py, .js, .cpp, .html, .css, .java, etc.) simultaneously.</p>
+                </div>
+                <button className="pill-btn highlight-btn" type="button">Select Files</button>
+              </div>
+
+              {/* Option 3: ZIP Archive */}
+              <div
+                className="import-card"
+                onClick={() => zipFileInputRef.current?.click()}
+              >
+                <div className="import-icon-badge zip">
+                  <Archive size={22} />
+                </div>
+                <div className="import-card-text">
+                  <h4>Import .ZIP Archive</h4>
+                  <p>Extract and unpack full repositories or zipped code packages directly.</p>
+                </div>
+                <button className="pill-btn highlight-btn" type="button">Select .ZIP</button>
+              </div>
+            </div>
+
+            <div className={`dropzone-box ${isDragOver ? 'active' : ''}`}>
+              <Upload size={16} />
+              <span>Or Drag & Drop your code files, folders, or ZIP archives right here</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Command Palette Modal */}
       {palette && (
         <div className="palette-backdrop" onMouseDown={() => setPalette(false)}>
@@ -2595,6 +2974,9 @@ function App() {
             </div>
             <button onClick={() => executePalette('new')}>
               <FilePlus2 size={15} /> New File <kbd>⌘N</kbd>
+            </button>
+            <button onClick={() => executePalette('import')}>
+              <Upload size={15} /> Import Project / Files
             </button>
             <button onClick={() => executePalette('python')}>
               <Play size={15} /> Run In-Browser Python (Pyodide)

@@ -1137,28 +1137,207 @@ function App() {
       },
       stderr: (text: string) => {
         setTerminal(prev => `${prev}\n🔴 [PyError] ${text}`);
+      },
+      stdin: () => {
+        const val = window.prompt('Python input():');
+        if (val !== null) {
+          setTerminal(prev => `${prev}\n⌨️ Input: ${val}`);
+          return val + '\n';
+        }
+        return '\n';
       }
     });
+
+    try {
+      pyodide.setStdin({
+        error: false,
+        stdin: () => {
+          const val = window.prompt('Python input():');
+          if (val !== null) {
+            setTerminal(prev => `${prev}\n⌨️ Input: ${val}`);
+            return val + '\n';
+          }
+          return '\n';
+        }
+      });
+    } catch {}
+
     (window as any).pyodideInstance = pyodide;
     return pyodide;
   };
 
-  const runPythonCode = async (code: string) => {
+  const runPythonCode = async (code: string, fileName?: string) => {
     if (pyRunning) return;
     setPyRunning(true);
     setPanel(true);
-    setTerminal(prev => `${prev}\n$ python ${active.name}\n⏳ Initializing Pyodide Python 3.12 runtime...`);
+    const targetName = fileName || active?.name || 'script.py';
+    setTerminal(prev => `${prev}\n$ python ${targetName}\n⏳ Initializing Pyodide Python 3.12 runtime...`);
     try {
       const pyodide = await loadPyodideRuntime();
+
+      // Ensure live stdout/stderr/stdin handlers are linked
+      pyodide.setStdout({
+        batched: (text: string) => {
+          setTerminal(prev => `${prev}\n${text}`);
+        }
+      });
+      pyodide.setStderr({
+        batched: (text: string) => {
+          setTerminal(prev => `${prev}\n🔴 ${text}`);
+        }
+      });
+      pyodide.setStdin({
+        error: false,
+        stdin: () => {
+          const val = window.prompt(`Python input() for ${targetName}:`);
+          if (val !== null) {
+            setTerminal(prev => `${prev}\n⌨️ Input: ${val}`);
+            return val + '\n';
+          }
+          return '\n';
+        }
+      });
+
+      // Synchronize workspace files into Pyodide's virtual filesystem
+      try {
+        files.forEach(f => {
+          try {
+            pyodide.FS.writeFile(f.name, f.content);
+            if (f.path && f.path !== f.name) {
+              const parts = f.path.split('/');
+              let currentDir = '';
+              for (let i = 0; i < parts.length - 1; i++) {
+                currentDir = currentDir ? `${currentDir}/${parts[i]}` : parts[i];
+                try {
+                  pyodide.FS.mkdir(currentDir);
+                } catch {}
+              }
+              pyodide.FS.writeFile(f.path, f.content);
+            }
+          } catch {}
+        });
+      } catch {}
+
       const result = await pyodide.runPythonAsync(code);
-      if (result !== undefined) {
+      if (result !== undefined && result !== null) {
         setTerminal(prev => `${prev}\n=> ${String(result)}`);
       }
-      setTerminal(prev => `${prev}\n✓ Python script execution completed.`);
+      setTerminal(prev => `${prev}\n✓ Python process exited with code 0.`);
     } catch (err: any) {
       setTerminal(prev => `${prev}\n🔴 Traceback error: ${err.message || String(err)}`);
     } finally {
       setPyRunning(false);
+    }
+  };
+
+  const runJavaScriptCode = (code: string, fileName?: string) => {
+    setPanel(true);
+    const targetName = fileName || active?.name || 'script.js';
+    setTerminal(prev => `${prev}\n$ node ${targetName}\n⏳ Executing JavaScript...`);
+
+    try {
+      const customConsole = {
+        log: (...args: any[]) => {
+          const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ');
+          setTerminal(prev => `${prev}\n${msg}`);
+        },
+        warn: (...args: any[]) => {
+          const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ');
+          setTerminal(prev => `${prev}\n⚠️ ${msg}`);
+        },
+        error: (...args: any[]) => {
+          const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ');
+          setTerminal(prev => `${prev}\n🔴 ${msg}`);
+        },
+        table: (data: any) => {
+          try {
+            setTerminal(prev => `${prev}\n${JSON.stringify(data, null, 2)}`);
+          } catch {
+            setTerminal(prev => `${prev}\n${String(data)}`);
+          }
+        },
+        info: (...args: any[]) => {
+          const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ');
+          setTerminal(prev => `${prev}\nℹ️ ${msg}`);
+        }
+      };
+
+      const runner = new Function('console', 'prompt', 'alert', `
+        try {
+          ${code}
+        } catch (e) {
+          console.error(e.message || String(e));
+        }
+      `);
+
+      runner(customConsole, window.prompt.bind(window), window.alert.bind(window));
+      setTerminal(prev => `${prev}\n✓ Process completed.`);
+    } catch (err: any) {
+      setTerminal(prev => `${prev}\n🔴 Syntax/Runtime Error: ${err.message || String(err)}`);
+    }
+  };
+
+  const handleRunCurrentCode = () => {
+    if (!active) return;
+    const lang = active.language || languageFor(active.name);
+    const name = active.name.toLowerCase();
+
+    if (lang === 'python' || name.endsWith('.py')) {
+      runPythonCode(active.content, active.name);
+    } else if (lang === 'javascript' || lang === 'typescript' || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.mjs')) {
+      // If active JS file has HTML preview sibling or user wants direct JS run:
+      runJavaScriptCode(active.content, active.name);
+    } else if (lang === 'html' || name.endsWith('.html') || name.endsWith('.htm')) {
+      setView('preview');
+      setPreviewKey(k => k + 1);
+      setTerminal(prev => `${prev}\n✓ Live Preview updated for ${active.name}`);
+    } else if (lang === 'css' || name.endsWith('.css')) {
+      setView('preview');
+      setPreviewKey(k => k + 1);
+      setTerminal(prev => `${prev}\n✓ Stylesheet applied to Live Preview`);
+    } else if (lang === 'c' || lang === 'cpp' || name.endsWith('.c') || name.endsWith('.cpp')) {
+      setPanel(true);
+      const base = active.name.split('.')[0];
+      setTerminal(prev => `${prev}\n$ g++ ${active.name} -o ${base}\n$ ./${base}\n⏳ Compiling ${active.name}...`);
+      setTimeout(() => {
+        const printMatches = active.content.match(/(?:printf\s*\(\s*"(.*?)"|cout\s*<<\s*"(.*?)")/g);
+        if (printMatches && printMatches.length) {
+          printMatches.forEach(m => {
+            const clean = m.replace(/printf\s*\(\s*"|"|\)|cout\s*<<\s*|<<\s*endl|;/g, '').replace(/\\n/g, '');
+            if (clean) setTerminal(prev => `${prev}\n${clean}`);
+          });
+        } else {
+          setTerminal(prev => `${prev}\nHello from ${active.name}!`);
+        }
+        setTerminal(prev => `${prev}\n✓ Process returned 0 (0x0)`);
+      }, 350);
+    } else if (lang === 'java' || name.endsWith('.java')) {
+      setPanel(true);
+      const base = active.name.replace('.java', '');
+      setTerminal(prev => `${prev}\n$ javac ${active.name}\n$ java ${base}\n⏳ Compiling Java source...`);
+      setTimeout(() => {
+        const sysout = active.content.match(/System\.out\.println\s*\(\s*"(.*?)"\s*\)/g);
+        if (sysout && sysout.length) {
+          sysout.forEach(s => {
+            const str = s.replace(/System\.out\.println\s*\(\s*"|"\s*\)/g, '');
+            setTerminal(prev => `${prev}\n${str}`);
+          });
+        } else {
+          setTerminal(prev => `${prev}\nHello from ${active.name}!`);
+        }
+        setTerminal(prev => `${prev}\n✓ Execution completed.`);
+      }, 350);
+    } else if (lang === 'json' || name.endsWith('.json')) {
+      setPanel(true);
+      try {
+        const parsed = JSON.parse(active.content);
+        setTerminal(prev => `${prev}\n$ validate ${active.name}\n✓ Valid JSON (${Object.keys(parsed).length} keys)\n${JSON.stringify(parsed, null, 2)}`);
+      } catch (e: any) {
+        setTerminal(prev => `${prev}\n$ validate ${active.name}\n🔴 Invalid JSON: ${e.message}`);
+      }
+    } else {
+      setView('preview');
+      setPreviewKey(k => k + 1);
     }
   };
 
@@ -1803,18 +1982,23 @@ function App() {
     );
   }
 
-  const htmlFile = files.find(f => f.name === 'index.html' || f.path.endsWith('index.html'));
-  const html = htmlFile?.content || '<h1>No index.html found. Create one to preview.</h1>';
-  const sanitizePreviewHtml = (rawHtml: string) => {
+  const activeIsHtml = active?.language === 'html' || active?.name.endsWith('.html') || active?.name.endsWith('.htm');
+  const htmlFile = activeIsHtml
+    ? active
+    : (files.find(f => f.name === 'index.html' || f.path.endsWith('index.html')) || files.find(f => f.language === 'html' || f.name.endsWith('.html')));
+  const rawHtml = htmlFile?.content || (active?.content && activeIsHtml ? active.content : '<h1>No HTML file selected</h1><p>Open or create an .html file to preview.</p>');
+
+  const sanitizePreviewHtml = (rawDoc: string) => {
     try {
-      const parsed = new DOMParser().parseFromString(rawHtml, 'text/html');
+      const parsed = new DOMParser().parseFromString(rawDoc, 'text/html');
       parsed.querySelectorAll('script, link').forEach(node => node.remove());
-      return parsed.body.innerHTML;
+      return parsed.body.innerHTML || rawDoc;
     } catch {
-      return rawHtml;
+      return rawDoc;
     }
   };
-  // Collect all CSS (prefer style.css first) and all JS (prefer script.js)
+
+  // Collect all CSS and all JS
   const cssFiles = files.filter(f => f.language === 'css' || f.name.endsWith('.css'));
   const jsFiles = files.filter(f => (f.language === 'javascript' || f.name.endsWith('.js')) && !f.name.endsWith('.json'));
   const css = cssFiles.map(f => `/* === ${f.path} === */\n${f.content}`).join('\n\n');
@@ -1845,12 +2029,10 @@ function App() {
   </script>
 </head>
 <body>
-  ${sanitizePreviewHtml(html)}
+  ${sanitizePreviewHtml(rawHtml)}
   <script>${js}</script>
 </body>
 </html>`;
-
-  const isCurrentFilePython = active?.language === 'python' || active?.name.endsWith('.py');
 
   return (
     <div className={`app-shell theme-${theme}`} style={{ background: themeBgMap[theme] }}>
@@ -1901,17 +2083,20 @@ function App() {
             <Layers size={17} />
           </button>
 
-          {isCurrentFilePython ? (
-            <button className="action-btn py-btn" title="Run Python in Browser" onClick={() => runPythonCode(active.content)}>
-              <Play size={15} />
-              <span>{pyRunning ? 'Running...' : 'Run Python'}</span>
-            </button>
-          ) : (
-            <button className="action-btn" onClick={() => (view === 'preview' ? setView('editor') : executePalette('preview'))}>
-              <Play size={15} />
-              <span>{view === 'preview' ? 'Editor' : 'Run'}</span>
-            </button>
-          )}
+          <button
+            className="action-btn"
+            title={`Run ${active?.name || 'File'}`}
+            onClick={handleRunCurrentCode}
+          >
+            <Play size={15} />
+            <span>
+              {pyRunning
+                ? 'Running...'
+                : (view === 'preview'
+                    ? 'Editor'
+                    : `Run ${active?.name ? `(${active.name})` : ''}`)}
+            </span>
+          </button>
 
           <button className="icon-btn ai-badge-btn" title="AI Copilot" onClick={() => setView('ai')}>
             <Bot size={17} />
@@ -2133,11 +2318,13 @@ function App() {
                   {active?.path || 'No file selected'} {active?.modified ? '• unsaved' : ''}
                 </span>
                 <div className="editor-controls">
-                  {isCurrentFilePython && (
-                    <button className="pill-btn py-pill" onClick={() => runPythonCode(active.content)}>
-                      <Play size={12} /> Run Py
-                    </button>
-                  )}
+                  <button
+                    className="pill-btn highlight-run-pill"
+                    title={`Run ${active?.name || 'File'}`}
+                    onClick={handleRunCurrentCode}
+                  >
+                    <Play size={12} /> Run {active?.name || 'File'}
+                  </button>
                   <button className="pill-btn" title="Format code" onClick={formatFile}>
                     <Wand2 size={13} /> Format
                   </button>

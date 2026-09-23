@@ -1122,35 +1122,25 @@ function App() {
   // Pyodide Python Runner Engine
   const loadPyodideRuntime = async () => {
     if ((window as any).pyodideInstance) return (window as any).pyodideInstance;
-    if (!(window as any).loadPyodide) {
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
-    }
-    const pyodide = await (window as any).loadPyodide({
-      stdout: (text: string) => {
-        setTerminal(prev => `${prev}\n${text}`);
-      },
-      stderr: (text: string) => {
-        setTerminal(prev => `${prev}\n🔴 [PyError] ${text}`);
-      },
-      stdin: () => {
-        const val = window.prompt('Python input():');
-        if (val !== null) {
-          setTerminal(prev => `${prev}\n⌨️ Input: ${val}`);
-          return val + '\n';
-        }
-        return '\n';
-      }
-    });
+    if ((window as any).pyodideLoadingPromise) return (window as any).pyodideLoadingPromise;
 
-    try {
-      pyodide.setStdin({
-        error: false,
+    (window as any).pyodideLoadingPromise = (async () => {
+      if (!(window as any).loadPyodide) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      const pyodide = await (window as any).loadPyodide({
+        stdout: (text: string) => {
+          setTerminal(prev => `${prev}\n${text}`);
+        },
+        stderr: (text: string) => {
+          setTerminal(prev => `${prev}\n🔴 [PyError] ${text}`);
+        },
         stdin: () => {
           const val = window.prompt('Python input():');
           if (val !== null) {
@@ -1160,18 +1150,47 @@ function App() {
           return '\n';
         }
       });
-    } catch {}
 
-    (window as any).pyodideInstance = pyodide;
-    return pyodide;
+      try {
+        pyodide.setStdin({
+          error: false,
+          stdin: () => {
+            const val = window.prompt('Python input():');
+            if (val !== null) {
+              setTerminal(prev => `${prev}\n⌨️ Input: ${val}`);
+              return val + '\n';
+            }
+            return '\n';
+          }
+        });
+      } catch {}
+
+      (window as any).pyodideInstance = pyodide;
+      return pyodide;
+    })();
+
+    return (window as any).pyodideLoadingPromise;
   };
+
+  // Pre-warm Python Pyodide engine in the background
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadPyodideRuntime().catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const runPythonCode = async (code: string, fileName?: string) => {
     if (pyRunning) return;
     setPyRunning(true);
     setPanel(true);
     const targetName = fileName || active?.name || 'script.py';
-    setTerminal(prev => `${prev}\n$ python ${targetName}\n⏳ Initializing Pyodide Python 3.12 runtime...`);
+    const isCached = !!(window as any).pyodideInstance;
+    if (!isCached) {
+      setTerminal(prev => `${prev}\n$ python ${targetName}\n⏳ Downloading Python 3.12 runtime (~6MB WebAssembly, 1st run only)...`);
+    } else {
+      setTerminal(prev => `${prev}\n$ python ${targetName}`);
+    }
     try {
       const pyodide = await loadPyodideRuntime();
 

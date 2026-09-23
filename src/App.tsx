@@ -2195,6 +2195,22 @@ function App() {
                     </span>
                   </button>
                   <div className="file-actions">
+                    <button
+                      title="Download File"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = file.name;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        setTerminal(prev => `${prev}\n✓ Downloaded file: ${file.name}`);
+                      }}
+                    >
+                      <Download size={12} />
+                    </button>
                     <button title="Rename" onClick={() => setRenameId(file.id)}>
                       R
                     </button>

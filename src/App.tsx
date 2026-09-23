@@ -1300,12 +1300,15 @@ function App() {
     if (!active) return;
     const lang = active.language || languageFor(active.name);
     const name = active.name.toLowerCase();
+    const liveCode = editorRef.current ? editorRef.current.getValue() : active.content;
+
+    // Immediately sync and auto-save
+    setFiles(prev => prev.map(f => (f.id === active.id ? { ...f, content: liveCode, modified: false } : f)));
 
     if (lang === 'python' || name.endsWith('.py')) {
-      runPythonCode(active.content, active.name);
+      runPythonCode(liveCode, active.name);
     } else if (lang === 'javascript' || lang === 'typescript' || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.mjs')) {
-      // If active JS file has HTML preview sibling or user wants direct JS run:
-      runJavaScriptCode(active.content, active.name);
+      runJavaScriptCode(liveCode, active.name);
     } else if (lang === 'html' || name.endsWith('.html') || name.endsWith('.htm')) {
       setView('preview');
       setPreviewKey(k => k + 1);
@@ -1319,7 +1322,7 @@ function App() {
       const base = active.name.split('.')[0];
       setTerminal(prev => `${prev}\n$ g++ ${active.name} -o ${base}\n$ ./${base}\n⏳ Compiling ${active.name}...`);
       setTimeout(() => {
-        const printMatches = active.content.match(/(?:printf\s*\(\s*"(.*?)"|cout\s*<<\s*"(.*?)")/g);
+        const printMatches = liveCode.match(/(?:printf\s*\(\s*"(.*?)"|cout\s*<<\s*"(.*?)")/g);
         if (printMatches && printMatches.length) {
           printMatches.forEach(m => {
             const clean = m.replace(/printf\s*\(\s*"|"|\)|cout\s*<<\s*|<<\s*endl|;/g, '').replace(/\\n/g, '');
@@ -1329,13 +1332,13 @@ function App() {
           setTerminal(prev => `${prev}\nHello from ${active.name}!`);
         }
         setTerminal(prev => `${prev}\n✓ Process returned 0 (0x0)`);
-      }, 350);
+      }, 200);
     } else if (lang === 'java' || name.endsWith('.java')) {
       setPanel(true);
       const base = active.name.replace('.java', '');
       setTerminal(prev => `${prev}\n$ javac ${active.name}\n$ java ${base}\n⏳ Compiling Java source...`);
       setTimeout(() => {
-        const sysout = active.content.match(/System\.out\.println\s*\(\s*"(.*?)"\s*\)/g);
+        const sysout = liveCode.match(/System\.out\.println\s*\(\s*"(.*?)"\s*\)/g);
         if (sysout && sysout.length) {
           sysout.forEach(s => {
             const str = s.replace(/System\.out\.println\s*\(\s*"|"\s*\)/g, '');
@@ -1345,11 +1348,11 @@ function App() {
           setTerminal(prev => `${prev}\nHello from ${active.name}!`);
         }
         setTerminal(prev => `${prev}\n✓ Execution completed.`);
-      }, 350);
+      }, 200);
     } else if (lang === 'json' || name.endsWith('.json')) {
       setPanel(true);
       try {
-        const parsed = JSON.parse(active.content);
+        const parsed = JSON.parse(liveCode);
         setTerminal(prev => `${prev}\n$ validate ${active.name}\n✓ Valid JSON (${Object.keys(parsed).length} keys)\n${JSON.stringify(parsed, null, 2)}`);
       } catch (e: any) {
         setTerminal(prev => `${prev}\n$ validate ${active.name}\n🔴 Invalid JSON: ${e.message}`);

@@ -2715,6 +2715,178 @@ button, input, textarea, select {
   user-select: none;
 }
 
+/* AI 1-Click Error Fixer Button */
+.fix-with-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: #ffffff;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.35);
+  transition: all 0.2s ease;
+  animation: pulseGlow 2s infinite alternate;
+}
+
+.fix-with-ai-btn:hover {
+  transform: scale(1.04);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.55);
+  border-color: #c4b5fd;
+}
+
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 6px rgba(124, 58, 237, 0.3); }
+  100% { box-shadow: 0 0 14px rgba(59, 130, 246, 0.6); }
+}
+
+/* Matplotlib Plot Output Viewer */
+.plot-output-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #090d13;
+  border-radius: 8px;
+  margin-top: 8px;
+  min-height: 220px;
+}
+
+.plot-image-render {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 8px;
+  border: 1px solid #1e293b;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.plot-save-btn {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #1e293b;
+  color: #93c5fd;
+  border: 1px solid #3b82f6;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.plot-save-btn:hover {
+  background: #2563eb;
+  color: #fff;
+}
+
+/* Symbol & Snippet Bar Toggle */
+.symbol-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(37, 99, 235, 0.2);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.symbol-mode-toggle:hover {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+/* Share Modal Overlay & Card */
+.share-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.share-modal-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  width: min(94vw, 480px);
+  padding: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: #f1f5f9;
+}
+
+.share-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.share-modal-head h3 {
+  margin: 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #60a5fa;
+}
+
+.share-url-box {
+  display: flex;
+  gap: 8px;
+  background: #090d16;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 6px 10px;
+  align-items: center;
+}
+
+.share-url-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-size: 12px;
+  outline: none;
+  font-family: monospace;
+}
+
+.share-copy-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.share-copy-btn:hover {
+  background: #1d4ed8;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-fade-up,
   .pulse-glow,
@@ -2733,3 +2905,4 @@ button, input, textarea, select {
     animation: none;
   }
 }
+

@@ -795,7 +795,21 @@ function App() {
   const multiFileInputRef = useRef<HTMLInputElement>(null);
   const zipFileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
-  const monacoRef = useRef<any>(null);
+  // Mobile Toolbar Mode (Symbols vs Language Snippets)
+  const [toolbarMode, setToolbarMode] = useState<'symbols' | 'snippets'>('symbols');
+
+  // Matplotlib Python Plot Image State
+  const [plotImage, setPlotImage] = useState<string | null>(null);
+  const [panelTab, setPanelTab] = useState<'terminal' | 'logs' | 'plot'>('terminal');
+
+  // Instant Share Modal State
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
+
+  // Error detector for 1-Click AI Fixer
+  const hasTerminalError = useMemo(() => {
+    return /🔴|Traceback|SyntaxError|TypeError|ReferenceError|NameError|Error:|failed|Exception|cannot find/i.test(terminal);
+  }, [terminal]);
 
   const active = files.find(f => f.id === activeId) || files[0];
   const filtered = useMemo(() => files.filter(f => `${f.path} ${f.name}`.toLowerCase().includes(search.toLowerCase())), [files, search]);
@@ -828,6 +842,113 @@ function App() {
       window.removeEventListener('orientationchange', handleResize);
     };
   }, []);
+
+  // Auto-load shared project from URL hash
+  useEffect(() => {
+    try {
+      if (window.location.hash.startsWith('#share=')) {
+        const raw = window.location.hash.replace('#share=', '');
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(raw)))));
+        if (Array.isArray(decoded) && decoded.length) {
+          setFiles(decoded);
+          setActiveId(decoded[0]?.id || 'index');
+          setTerminal(prev => `${prev}\n🎉 [Share Link]: Loaded project snapshot with ${decoded.length} files!`);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load shared project from hash', e);
+    }
+  }, []);
+
+  const generateShareLink = () => {
+    try {
+      const payload = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(files)))));
+      const shareUrl = `${window.location.origin}${window.location.pathname}#share=${payload}`;
+      navigator.clipboard?.writeText(shareUrl).catch(() => {});
+      setShowShareModal(true);
+      setCopiedShare(true);
+      setTerminal(prev => `${prev}\n🔗 Share URL generated and copied to clipboard!`);
+    } catch {
+      setShowShareModal(true);
+    }
+  };
+
+  const getLanguageSnippets = (lang: string) => {
+    switch (lang) {
+      case 'python':
+        return [
+          { label: 'def', insert: 'def ():' },
+          { label: 'class', insert: 'class :' },
+          { label: 'print', insert: 'print()' },
+          { label: 'import', insert: 'import ' },
+          { label: 'for in', insert: 'for item in :' },
+          { label: 'if/else', insert: 'if :\n    pass\nelse:\n    pass' },
+          { label: 'return', insert: 'return ' },
+          { label: 'try/except', insert: 'try:\n    pass\nexcept Exception as e:\n    print(e)' },
+          { label: 'self.', insert: 'self.' },
+          { label: 'lambda', insert: 'lambda x: ' }
+        ];
+      case 'javascript':
+      case 'typescript':
+        return [
+          { label: 'const', insert: 'const ' },
+          { label: 'let', insert: 'let ' },
+          { label: 'function', insert: 'function () {\n  \n}' },
+          { label: '=>', insert: '() => {\n  \n}' },
+          { label: 'log', insert: 'console.log();' },
+          { label: 'async', insert: 'async ' },
+          { label: 'await', insert: 'await ' },
+          { label: 'return', insert: 'return ' },
+          { label: 'if/else', insert: 'if () {\n  \n} else {\n  \n}' },
+          { label: 'try/catch', insert: 'try {\n  \n} catch (e) {\n  console.error(e);\n}' }
+        ];
+      case 'html':
+        return [
+          { label: 'div', insert: '<div></div>' },
+          { label: 'button', insert: '<button></button>' },
+          { label: 'class', insert: 'class=""' },
+          { label: 'script', insert: '<script>\n  \n</script>' },
+          { label: 'style', insert: '<style>\n  \n</style>' },
+          { label: 'p', insert: '<p></p>' },
+          { label: 'h1', insert: '<h1></h1>' },
+          { label: 'span', insert: '<span></span>' }
+        ];
+      case 'css':
+        return [
+          { label: 'display: flex', insert: 'display: flex;' },
+          { label: 'grid', insert: 'display: grid;' },
+          { label: 'center', insert: 'place-items: center;' },
+          { label: 'padding', insert: 'padding: 16px;' },
+          { label: 'margin', insert: 'margin: 0 auto;' },
+          { label: 'color', insert: 'color: #ffffff;' },
+          { label: 'border', insert: 'border: 1px solid #334155;' },
+          { label: 'radius', insert: 'border-radius: 8px;' }
+        ];
+      case 'cpp':
+      case 'c':
+        return [
+          { label: '#include', insert: '#include <iostream>\n' },
+          { label: 'cout', insert: 'std::cout <<  << std::endl;' },
+          { label: 'int main', insert: 'int main() {\n    \n    return 0;\n}' },
+          { label: 'printf', insert: 'printf("\\n");' },
+          { label: 'for', insert: 'for (int i = 0; i < n; i++) {\n    \n}' },
+          { label: 'return 0', insert: 'return 0;' }
+        ];
+      case 'java':
+        return [
+          { label: 'public class', insert: 'public class Main {\n    \n}' },
+          { label: 'sysout', insert: 'System.out.println();' },
+          { label: 'main', insert: 'public static void main(String[] args) {\n    \n}' },
+          { label: 'return', insert: 'return;' }
+        ];
+      default:
+        return [
+          { label: 'function', insert: 'function' },
+          { label: 'return', insert: 'return' },
+          { label: 'if', insert: 'if' }
+        ];
+    }
+  };
 
   // Handle Live Share BroadcastChannel (stable: does not recreate on every file edit)
   useEffect(() => {
@@ -1197,6 +1318,16 @@ function App() {
       // Ensure live stdout/stderr/stdin handlers are linked
       pyodide.setStdout({
         batched: (text: string) => {
+          if (text.includes('__CODEFORGE_PLOT__:')) {
+            const parts = text.split('__CODEFORGE_PLOT__:');
+            const b64 = parts[1]?.trim();
+            if (b64) {
+              setPlotImage(`data:image/png;base64,${b64}`);
+              setPanelTab('plot');
+              setTerminal(prev => `${prev}\n📈 [Plot Generated]: Output sent to PLOTS tab.`);
+              return;
+            }
+          }
           setTerminal(prev => `${prev}\n${text}`);
         }
       });
@@ -1237,7 +1368,37 @@ function App() {
         });
       } catch {}
 
+      // Auto-load matplotlib if code imports it
+      if (code.includes('matplotlib') || code.includes('plt.')) {
+        try {
+          if (!pyodide.loadedPackages?.matplotlib) {
+            setTerminal(prev => `${prev}\n⏳ Loading matplotlib graphics package...`);
+            await pyodide.loadPackage('matplotlib');
+          }
+        } catch {}
+      }
+
       const result = await pyodide.runPythonAsync(code);
+
+      // Check if a plot was created in matplotlib and capture it
+      if (code.includes('matplotlib') || code.includes('plt.')) {
+        try {
+          await pyodide.runPythonAsync(`
+import sys
+if 'matplotlib.pyplot' in sys.modules:
+    import matplotlib.pyplot as _plt
+    import io, base64
+    if _plt.get_fignums():
+        _buf = io.BytesIO()
+        _plt.savefig(_buf, format='png', bbox_inches='tight', facecolor='#0b111a', edgecolor='none')
+        _buf.seek(0)
+        _img_b64 = base64.b64encode(_buf.read()).decode('utf-8')
+        _plt.close('all')
+        print('__CODEFORGE_PLOT__:' + _img_b64)
+`);
+        } catch {}
+      }
+
       if (result !== undefined && result !== null) {
         setTerminal(prev => `${prev}\n=> ${String(result)}`);
       }
@@ -1819,20 +1980,71 @@ function App() {
 
   const formatFile = () => {
     if (!active) return;
-    const content = active.content;
-    const formatted =
-      active.language === 'json'
-        ? (() => {
-            try {
-              return JSON.stringify(JSON.parse(content), null, 2);
-            } catch {
-              return content;
+    const content = editorRef.current ? editorRef.current.getValue() : active.content;
+    const lang = active.language;
+    let formatted = content;
+
+    try {
+      if (lang === 'json') {
+        formatted = JSON.stringify(JSON.parse(content), null, 2);
+      } else if (lang === 'javascript' || lang === 'typescript') {
+        // Standardize indentation and trim lines
+        let indent = 0;
+        formatted = content
+          .split('\n')
+          .map(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return '';
+            if (trimmed.startsWith('}') || trimmed.startsWith(']') || trimmed.startsWith(')')) {
+              indent = Math.max(0, indent - 1);
             }
-          })()
-        : content
-            .split('\n')
-            .map(line => line.trimEnd())
-            .join('\n');
+            const res = '  '.repeat(indent) + trimmed;
+            if (trimmed.endsWith('{') || trimmed.endsWith('[') || trimmed.endsWith('(')) {
+              indent++;
+            }
+            return res;
+          })
+          .join('\n');
+      } else if (lang === 'html') {
+        // Clean tag indents
+        let indent = 0;
+        formatted = content
+          .split('\n')
+          .map(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return '';
+            if (trimmed.startsWith('</') || trimmed.startsWith('-->')) {
+              indent = Math.max(0, indent - 1);
+            }
+            const res = '  '.repeat(indent) + trimmed;
+            if (
+              trimmed.startsWith('<') &&
+              !trimmed.startsWith('</') &&
+              !trimmed.startsWith('<!') &&
+              !trimmed.endsWith('/>') &&
+              !trimmed.includes('</') &&
+              !trimmed.startsWith('<meta') &&
+              !trimmed.startsWith('<link') &&
+              !trimmed.startsWith('<input') &&
+              !trimmed.startsWith('<br') &&
+              !trimmed.startsWith('<hr') &&
+              !trimmed.startsWith('<img')
+            ) {
+              indent++;
+            }
+            return res;
+          })
+          .join('\n');
+      } else {
+        formatted = content
+          .split('\n')
+          .map(line => line.trimEnd())
+          .join('\n');
+      }
+    } catch {
+      formatted = content.split('\n').map(line => line.trimEnd()).join('\n');
+    }
+
     updateContent(formatted);
     setTerminal(prev => `${prev}\n✓ Formatter applied to ${active.name}`);
   };
@@ -2128,6 +2340,9 @@ function App() {
           </button>
           <button className="icon-btn" title="Export ZIP" onClick={exportProjectZip}>
             <Download size={18} />
+          </button>
+          <button className="icon-btn" title="Share Project / Code URL" onClick={generateShareLink}>
+            <Share2 size={17} />
           </button>
           <button className="icon-btn" title="Import Project / Files" onClick={() => setShowImportModal(true)}>
             <Upload size={18} />
@@ -2435,8 +2650,16 @@ function App() {
                 <button className="symbol-btn redo-btn" title="Redo" onClick={handleRedo}>
                   <RotateCw size={14} />
                 </button>
+                <button
+                  className="symbol-mode-toggle"
+                  title="Switch between General Symbols and Language Keywords/Snippets"
+                  onClick={() => setToolbarMode(m => (m === 'symbols' ? 'snippets' : 'symbols'))}
+                >
+                  <Sparkles size={11} />
+                  <span>{toolbarMode === 'symbols' ? 'Snippets' : 'Symbols'}</span>
+                </button>
                 <div className="symbol-divider" />
-                {quickSymbols.map((s, idx) => (
+                {(toolbarMode === 'symbols' ? quickSymbols : getLanguageSnippets(active?.language || 'plaintext')).map((s, idx) => (
                   <button key={idx} className="symbol-btn" onClick={() => handleInsertSymbol(s)}>
                     {s.label}
                   </button>
@@ -2914,33 +3137,83 @@ function App() {
           {panel && (
             <section className="bottom-panel">
               <div className="panel-tabs">
-                <div>
-                  <button className="panel-active">TERMINAL</button>
-                  <button onClick={() => setTerminal(prev => `${prev}\n$ console clear`)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    className={panelTab === 'terminal' ? 'panel-active' : ''}
+                    onClick={() => setPanelTab('terminal')}
+                  >
+                    TERMINAL
+                  </button>
+                  <button
+                    className={panelTab === 'logs' ? 'panel-active' : ''}
+                    onClick={() => {
+                      setPanelTab('logs');
+                      setTerminal(prev => `${prev}\n$ console clear`);
+                    }}
+                  >
                     LOGS <em>{consoleLogs.length}</em>
                   </button>
+                  {plotImage && (
+                    <button
+                      className={panelTab === 'plot' ? 'panel-active' : ''}
+                      onClick={() => setPanelTab('plot')}
+                    >
+                      PLOTS 📈
+                    </button>
+                  )}
+                  {hasTerminalError && (
+                    <button
+                      className="fix-with-ai-btn"
+                      title="Analyze & fix this error with AI"
+                      onClick={() => {
+                        setView('ai');
+                        sendAiRequest(
+                          `I got the following runtime error in ${active?.name || 'my code'}:\n\n\`\`\`\n${terminal.slice(-800)}\n\`\`\`\n\nPlease diagnose the root cause and provide the complete fixed code for ${active?.name || 'the file'}.`
+                        );
+                      }}
+                    >
+                      <Sparkles size={12} />
+                      <span>Fix with AI</span>
+                    </button>
+                  )}
                 </div>
                 <button onClick={() => setPanel(false)}>
                   <X size={16} />
                 </button>
               </div>
-              <pre>{terminal}</pre>
-              <form
-                className="terminal-input"
-                onSubmit={e => {
-                  e.preventDefault();
-                  runCommand(command);
-                }}
-              >
-                <span>$</span>
-                <input
-                  value={command}
-                  onChange={e => setCommand(e.target.value)}
-                  placeholder="help, ls, python main.py, npm run dev..."
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                />
-              </form>
+
+              {panelTab === 'plot' && plotImage ? (
+                <div className="plot-output-view">
+                  <img src={plotImage} alt="Python Matplotlib Graphic Output" className="plot-image-render" />
+                  <a
+                    href={plotImage}
+                    download="codeforge-plot.png"
+                    className="plot-save-btn"
+                  >
+                    <Download size={13} /> Save Chart PNG
+                  </a>
+                </div>
+              ) : (
+                <>
+                  <pre>{terminal}</pre>
+                  <form
+                    className="terminal-input"
+                    onSubmit={e => {
+                      e.preventDefault();
+                      runCommand(command);
+                    }}
+                  >
+                    <span>$</span>
+                    <input
+                      value={command}
+                      onChange={e => setCommand(e.target.value)}
+                      placeholder="help, ls, python main.py, npm run dev..."
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                    />
+                  </form>
+                </>
+              )}
             </section>
           )}
         </main>
@@ -3184,6 +3457,48 @@ function App() {
             <div className={`dropzone-box ${isDragOver ? 'active' : ''}`}>
               <Upload size={16} />
               <span>Or Drag & Drop your code files, folders, or ZIP archives right here</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 1-Click Instant Share Project Modal */}
+      {showShareModal && (
+        <div className="share-modal-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="share-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="share-modal-head">
+              <h3>
+                <Share2 size={18} />
+                <span>Share CodeForge Project</span>
+              </h3>
+              <button className="pill-btn" onClick={() => setShowShareModal(false)}>
+                <X size={14} />
+              </button>
+            </div>
+            <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>
+              Anyone with this link can instantly open and run your {files.length} project files in their browser with 0 installation required!
+            </p>
+            <div className="share-url-box">
+              <input
+                readOnly
+                value={`${window.location.origin}${window.location.pathname}#share=${encodeURIComponent(
+                  btoa(unescape(encodeURIComponent(JSON.stringify(files))))
+                )}`}
+              />
+              <button
+                className="share-copy-btn"
+                onClick={() => {
+                  const url = `${window.location.origin}${window.location.pathname}#share=${encodeURIComponent(
+                    btoa(unescape(encodeURIComponent(JSON.stringify(files))))
+                  )}`;
+                  navigator.clipboard?.writeText(url).catch(() => {});
+                  setCopiedShare(true);
+                  setTimeout(() => setCopiedShare(false), 2500);
+                }}
+              >
+                {copiedShare ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedShare ? 'Copied!' : 'Copy Link'}</span>
+              </button>
             </div>
           </div>
         </div>

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Editor, { OnMount } from '@monaco-editor/react';
+import MonacoEditorRaw, { Editor as MonacoEditorNamed, OnMount } from '@monaco-editor/react';
 import JSZip from 'jszip';
+
+// Resilient fallback for ESM/CJS interop so Editor is always a valid React component
+const Editor: any = (MonacoEditorRaw as any)?.default || MonacoEditorNamed || MonacoEditorRaw;
+
+
 import {
   Archive,
   Bot,

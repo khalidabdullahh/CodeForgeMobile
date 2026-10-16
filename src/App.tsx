@@ -14,6 +14,7 @@ import {
   FileCode2,
   FilePlus2,
   FileText,
+  Files,
   FolderOpen,
   FolderPlus,
   GitBranch,
@@ -53,6 +54,7 @@ import { LandingPage } from './LandingPage';
 export type FileItem = { id: string; name: string; path: string; language: string; content: string; modified?: boolean };
 type Extension = { id: string; name: string; description: string; installed: boolean };
 type View = 'editor' | 'preview' | 'extensions' | 'git' | 'settings' | 'ai' | 'templates' | 'github-sync' | 'liveshare';
+export type SidebarTab = 'explorer' | 'search' | 'git' | 'debug' | 'ai' | 'extensions' | 'settings';
 type ThemeName = 'vs-dark' | 'light' | 'dracula' | 'one-dark-pro' | 'monokai' | 'synthwave-84';
 type AiProvider = 'gemini' | 'openai';
 
@@ -686,7 +688,11 @@ function App() {
   });
   const [activeId, setActiveId] = useState('index');
   const [openTabs, setOpenTabs] = useState<string[]>(['index']);
-  const [sidebar, setSidebar] = useState(false);
+  const [sidebar, setSidebar] = useState(() => window.innerWidth >= 768);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('explorer');
+  const [replaceSearch, setReplaceSearch] = useState('');
+  const [matchCase, setMatchCase] = useState(false);
+  const [matchWholeWord, setMatchWholeWord] = useState(false);
   const [panel, setPanel] = useState(false);
   const [search, setSearch] = useState('');
   const [contentSearch, setContentSearch] = useState('');
@@ -814,6 +820,73 @@ function App() {
   const active = files.find(f => f.id === activeId) || files[0];
   const filtered = useMemo(() => files.filter(f => `${f.path} ${f.name}`.toLowerCase().includes(search.toLowerCase())), [files, search]);
   const matches = useMemo(() => (contentSearch.trim() ? files.filter(f => f.content.toLowerCase().includes(contentSearch.toLowerCase())) : []), [files, contentSearch]);
+
+  const searchResultsWithSnippets = useMemo(() => {
+    if (!contentSearch.trim()) return [];
+    const q = contentSearch;
+    const isCase = matchCase;
+    const isWhole = matchWholeWord;
+    const qLower = q.toLowerCase();
+
+    return files.map(file => {
+      const lines = file.content.split('\n');
+      const matchedLines: { lineNum: number; lineText: string }[] = [];
+
+      lines.forEach((line, idx) => {
+        let isMatch = false;
+        if (isWhole) {
+          const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const reg = new RegExp(`\\b${escaped}\\b`, isCase ? 'g' : 'gi');
+          isMatch = reg.test(line);
+        } else if (isCase) {
+          isMatch = line.includes(q);
+        } else {
+          isMatch = line.toLowerCase().includes(qLower);
+        }
+
+        if (isMatch) {
+          matchedLines.push({ lineNum: idx + 1, lineText: line.trim() });
+        }
+      });
+
+      return {
+        file,
+        matchedLines
+      };
+    }).filter(res => res.matchedLines.length > 0);
+  }, [files, contentSearch, matchCase, matchWholeWord]);
+
+  const handleActivityBarClick = (tab: SidebarTab) => {
+    if (sidebar && sidebarTab === tab) {
+      setSidebar(false);
+    } else {
+      setSidebarTab(tab);
+      setSidebar(true);
+    }
+  };
+
+  const replaceAllAcrossFiles = () => {
+    if (!contentSearch) return;
+    let totalReplacements = 0;
+    let filesUpdated = 0;
+    setFiles(prev =>
+      prev.map(file => {
+        const regexFlags = matchCase ? 'g' : 'gi';
+        const queryEscaped = contentSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = matchWholeWord ? `\\b${queryEscaped}\\b` : queryEscaped;
+        const regex = new RegExp(pattern, regexFlags);
+        const matchesCount = (file.content.match(regex) || []).length;
+        if (matchesCount > 0) {
+          totalReplacements += matchesCount;
+          filesUpdated++;
+          const newContent = file.content.replace(regex, replaceSearch);
+          return { ...file, content: newContent, modified: true };
+        }
+        return file;
+      })
+    );
+    setTerminal(prev => `${prev}\n✓ Replaced ${totalReplacements} occurrence(s) in ${filesUpdated} file(s)`);
+  };
 
   useEffect(() => localStorage.setItem('codeforge-files', JSON.stringify(files)), [files]);
   useEffect(() => localStorage.setItem('codeforge-git', JSON.stringify(gitHistory)), [gitHistory]);
@@ -2375,157 +2448,627 @@ if 'matplotlib.pyplot' in sys.modules:
 
       {/* Main Workspace Area */}
       <div className="workspace">
-        {/* Sidebar */}
+        {/* VS Code Left Activity Bar */}
+        <nav className="activity-bar" aria-label="Activity Bar">
+          <div className="activity-top">
+            <button
+              className={`activity-btn ${sidebar && sidebarTab === 'explorer' ? 'active' : ''}`}
+              title="Explorer (Files)"
+              onClick={() => handleActivityBarClick('explorer')}
+            >
+              <Files size={18} />
+            </button>
+            <button
+              className={`activity-btn ${sidebar && sidebarTab === 'search' ? 'active' : ''}`}
+              title="Search & Replace"
+              onClick={() => handleActivityBarClick('search')}
+            >
+              <Search size={18} />
+              {contentSearch && matches.length > 0 && <span className="activity-badge" />}
+            </button>
+            <button
+              className={`activity-btn ${sidebar && sidebarTab === 'git' ? 'active' : ''}`}
+              title="Source Control (Git)"
+              onClick={() => handleActivityBarClick('git')}
+            >
+              <GitBranch size={18} />
+              {files.filter(f => f.modified).length > 0 && (
+                <span className="activity-badge" style={{ background: '#eab308' }} />
+              )}
+            </button>
+            <button
+              className={`activity-btn ${sidebar && sidebarTab === 'debug' ? 'active' : ''}`}
+              title="Run & Debug"
+              onClick={() => handleActivityBarClick('debug')}
+            >
+              <Play size={18} />
+            </button>
+            <button
+              className={`activity-btn ${sidebar && sidebarTab === 'ai' ? 'active' : ''}`}
+              title="AI Copilot"
+              onClick={() => handleActivityBarClick('ai')}
+            >
+              <Sparkles size={18} />
+              <span className="activity-badge-ai">AI</span>
+            </button>
+            <button
+              className={`activity-btn ${sidebar && sidebarTab === 'extensions' ? 'active' : ''}`}
+              title="Extensions"
+              onClick={() => handleActivityBarClick('extensions')}
+            >
+              <Package size={18} />
+            </button>
+          </div>
+          <div className="activity-bottom">
+            <button
+              className={`activity-btn ${sidebar && sidebarTab === 'settings' ? 'active' : ''}`}
+              title="Settings"
+              onClick={() => handleActivityBarClick('settings')}
+            >
+              <Settings size={18} />
+            </button>
+            <button
+              className="activity-btn"
+              title="Starter Templates"
+              onClick={() => setView('templates')}
+            >
+              <Layers size={18} />
+            </button>
+          </div>
+        </nav>
+
+        {/* Mobile Backdrop Overlay */}
+        {sidebar && <div className="sidebar-backdrop" onClick={() => setSidebar(false)} />}
+
+        {/* Multi-Pane Sidebar */}
         {sidebar && (
           <aside className="sidebar">
-            <div className="sidebar-head">
-              <span>EXPLORER</span>
-              <div className="explorer-actions">
-                <button className="mini-btn" title="New file" onClick={openCreateFileDialog}>
-                  <FilePlus2 size={15} />
-                </button>
-                <button
-                  className="mini-btn"
-                  title="New folder / file"
-                  onClick={openCreateFileDialog}
-                >
-                  <FolderPlus size={15} />
-                </button>
-                <button className="mini-btn" title="Close sidebar" onClick={() => setSidebar(false)}>
-                  <X size={15} />
-                </button>
-              </div>
-            </div>
-
-            <div className="search">
-              <Search size={15} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filter files..." />
-            </div>
-
-            <div className="tree-root">
-              <ChevronDown size={15} />
-              <FolderOpen size={16} />
-              <b>codeforge-workspace</b>
-            </div>
-
-            <div className="tree">
-              {filtered.map(file => (
-                <div key={file.id} className={`tree-file ${active?.id === file.id ? 'selected' : ''}`}>
-                  <button onClick={() => openFile(file.id)}>
-                    <FileCode2 size={16} />
-                    <span>
-                      {renameId === file.id ? (
-                        <input
-                          autoFocus
-                          defaultValue={file.name}
-                          onBlur={e => renameFile(file.id, e.currentTarget.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') renameFile(file.id, e.currentTarget.value);
-                          }}
-                        />
-                      ) : (
-                        <>
-                          {file.path}
-                          {file.modified ? ' •' : ''}
-                        </>
-                      )}
-                    </span>
-                  </button>
-                  <div className="file-actions">
-                    <button
-                      title="Download File"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = file.name;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        setTerminal(prev => `${prev}\n✓ Downloaded file: ${file.name}`);
-                      }}
-                    >
-                      <Download size={12} />
-                    </button>
-                    <button title="Rename" onClick={() => setRenameId(file.id)}>
-                      R
+            {/* 1. EXPLORER PANE */}
+            {sidebarTab === 'explorer' && (
+              <div className="sidebar-pane">
+                <div className="sidebar-head">
+                  <span>EXPLORER</span>
+                  <div className="explorer-actions">
+                    <button className="mini-btn" title="New file" onClick={openCreateFileDialog}>
+                      <FilePlus2 size={15} />
                     </button>
                     <button
-                      title="Duplicate"
-                      onClick={() => {
-                        const copy = { ...file, id: crypto.randomUUID(), name: `${file.name}.copy`, path: `${file.path}.copy`, modified: true };
-                        setFiles(prev => [...prev, copy]);
-                        openFile(copy.id);
-                      }}
+                      className="mini-btn"
+                      title="New folder / file"
+                      onClick={openCreateFileDialog}
                     >
-                      <Copy size={12} />
+                      <FolderPlus size={15} />
                     </button>
-                    <button title="Delete" onClick={() => deleteFile(file.id)}>
-                      <Trash2 size={12} />
+                    <button className="mini-btn" title="Close sidebar" onClick={() => setSidebar(false)}>
+                      <X size={15} />
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            <div className="side-section">
-              <label>SEARCH IN FILES</label>
-              <div className="search">
-                <Search size={14} />
-                <input value={contentSearch} onChange={e => setContentSearch(e.target.value)} placeholder="Find text..." />
-              </div>
-              {contentSearch && (
-                <div className="search-results">
-                  {matches.map(file => (
-                    <button key={file.id} onClick={() => openFile(file.id)}>
-                      {file.name}
-                      <span>{file.content.toLowerCase().split(contentSearch.toLowerCase()).length - 1} matches</span>
-                    </button>
-                  ))}
-                  {!matches.length && <small>No matches found</small>}
+                <div className="search">
+                  <Search size={15} />
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filter files..." />
                 </div>
-              )}
-            </div>
 
-            <div className="side-tools">
-              <button onClick={() => { setView('templates'); setSidebar(false); }}>
-                <Layers size={15} /> Starter Templates
-              </button>
-              <button onClick={() => { setView('github-sync'); setSidebar(false); }}>
-                <Cloud size={15} /> GitHub Cloud Push & Pull
-              </button>
-              <button onClick={() => { setView('liveshare'); setSidebar(false); }}>
-                <Users size={15} /> Live Share Collaboration
-              </button>
-              <button onClick={() => { setView('ai'); setSidebar(false); }}>
-                <Bot size={15} /> AI Coding Copilot
-              </button>
-              <button onClick={() => { setView('git'); setSidebar(false); }}>
-                <GitBranch size={15} /> Source Control
-              </button>
-              <button onClick={() => { setView('extensions'); setSidebar(false); }}>
-                <Package size={15} /> Extensions
-              </button>
-              <button onClick={() => { setPanel(v => !v); setSidebar(false); }}>
-                <Terminal size={15} /> Terminal & Console
-              </button>
-              <button onClick={exportProjectZip}>
-                <Archive size={15} /> Export as ZIP
-              </button>
-              <button onClick={() => { setShowImportModal(true); setSidebar(false); }}>
-                <Upload size={15} /> Import Project
-              </button>
-              <button onClick={exportAndroidPackage}>
-                <Download size={15} /> Android Package Setup
-              </button>
-              <button onClick={() => setInIdeMode(false)}>
-                <Home size={15} /> Landing Page
-              </button>
-            </div>
+                <div className="tree-root">
+                  <ChevronDown size={15} />
+                  <FolderOpen size={16} />
+                  <b>codeforge-workspace</b>
+                </div>
 
+                <div className="tree">
+                  {filtered.map(file => (
+                    <div key={file.id} className={`tree-file ${active?.id === file.id ? 'selected' : ''}`}>
+                      <button onClick={() => openFile(file.id)}>
+                        <FileCode2 size={16} />
+                        <span>
+                          {renameId === file.id ? (
+                            <input
+                              autoFocus
+                              defaultValue={file.name}
+                              onBlur={e => renameFile(file.id, e.currentTarget.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') renameFile(file.id, e.currentTarget.value);
+                              }}
+                            />
+                          ) : (
+                            <>
+                              {file.path}
+                              {file.modified ? ' •' : ''}
+                            </>
+                          )}
+                        </span>
+                      </button>
+                      <div className="file-actions">
+                        <button
+                          title="Download File"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = file.name;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            setTerminal(prev => `${prev}\n✓ Downloaded file: ${file.name}`);
+                          }}
+                        >
+                          <Download size={12} />
+                        </button>
+                        <button title="Rename" onClick={() => setRenameId(file.id)}>
+                          R
+                        </button>
+                        <button
+                          title="Duplicate"
+                          onClick={() => {
+                            const copy = { ...file, id: crypto.randomUUID(), name: `${file.name}.copy`, path: `${file.path}.copy`, modified: true };
+                            setFiles(prev => [...prev, copy]);
+                            openFile(copy.id);
+                          }}
+                        >
+                          <Copy size={12} />
+                        </button>
+                        <button title="Delete" onClick={() => deleteFile(file.id)}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="side-tools">
+                  <button onClick={() => { setView('templates'); if (window.innerWidth < 768) setSidebar(false); }}>
+                    <Layers size={15} /> Starter Templates
+                  </button>
+                  <button onClick={() => { setView('github-sync'); if (window.innerWidth < 768) setSidebar(false); }}>
+                    <Cloud size={15} /> GitHub Cloud Push & Pull
+                  </button>
+                  <button onClick={() => { setView('liveshare'); if (window.innerWidth < 768) setSidebar(false); }}>
+                    <Users size={15} /> Live Share Collaboration
+                  </button>
+                  <button onClick={() => { setPanel(v => !v); if (window.innerWidth < 768) setSidebar(false); }}>
+                    <Terminal size={15} /> Terminal & Console
+                  </button>
+                  <button onClick={exportProjectZip}>
+                    <Archive size={15} /> Export as ZIP
+                  </button>
+                  <button onClick={() => { setShowImportModal(true); if (window.innerWidth < 768) setSidebar(false); }}>
+                    <Upload size={15} /> Import Project
+                  </button>
+                  <button onClick={exportAndroidPackage}>
+                    <Download size={15} /> Android Package Setup
+                  </button>
+                  <button onClick={() => setInIdeMode(false)}>
+                    <Home size={15} /> Landing Page
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 2. SEARCH & REPLACE PANE */}
+            {sidebarTab === 'search' && (
+              <div className="sidebar-pane">
+                <div className="sidebar-head">
+                  <span>SEARCH & REPLACE</span>
+                  <button className="mini-btn" title="Close sidebar" onClick={() => setSidebar(false)}>
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <div className="sidebar-search-group">
+                  <div className="sidebar-search-input">
+                    <Search size={13} className="text-muted" />
+                    <input
+                      value={contentSearch}
+                      onChange={e => setContentSearch(e.target.value)}
+                      placeholder="Search text across files..."
+                    />
+                  </div>
+                  <div className="sidebar-search-input">
+                    <RefreshCw size={13} className="text-muted" />
+                    <input
+                      value={replaceSearch}
+                      onChange={e => setReplaceSearch(e.target.value)}
+                      placeholder="Replace with..."
+                    />
+                  </div>
+                  <div className="sidebar-search-actions">
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        className="sidebar-chip"
+                        onClick={() => setMatchCase(v => !v)}
+                        title="Match Case"
+                        style={matchCase ? { borderColor: '#3b82f6', color: '#60a5fa', background: 'rgba(59, 130, 246, 0.15)' } : {}}
+                      >
+                        Aa
+                      </button>
+                      <button
+                        className="sidebar-chip"
+                        onClick={() => setMatchWholeWord(v => !v)}
+                        title="Match Whole Word"
+                        style={matchWholeWord ? { borderColor: '#3b82f6', color: '#60a5fa', background: 'rgba(59, 130, 246, 0.15)' } : {}}
+                      >
+                        \b
+                      </button>
+                    </div>
+                    <button
+                      className="sidebar-btn-secondary"
+                      onClick={replaceAllAcrossFiles}
+                      disabled={!contentSearch}
+                      title="Replace all occurrences across all files"
+                    >
+                      Replace All
+                    </button>
+                  </div>
+                </div>
+
+                <div className="sidebar-pane-body">
+                  {contentSearch ? (
+                    <>
+                      <div className="sidebar-section-title">
+                        {searchResultsWithSnippets.length > 0
+                          ? `${searchResultsWithSnippets.reduce((sum, r) => sum + r.matchedLines.length, 0)} results in ${searchResultsWithSnippets.length} files`
+                          : 'No matches found'}
+                      </div>
+                      {searchResultsWithSnippets.map(res => (
+                        <div key={res.file.id} className="sidebar-match-card">
+                          <div
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', cursor: 'pointer' }}
+                            onClick={() => openFile(res.file.id)}
+                          >
+                            <span style={{ fontWeight: 600, fontSize: '11px', color: '#60a5fa' }}>{res.file.name}</span>
+                            <span className="sidebar-badge active">{res.matchedLines.length}</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            {res.matchedLines.slice(0, 5).map(m => (
+                              <div
+                                key={m.lineNum}
+                                style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}
+                                onClick={() => {
+                                  openFile(res.file.id);
+                                  if (editorRef.current) {
+                                    editorRef.current.revealLineInCenter(m.lineNum);
+                                    editorRef.current.setPosition({ lineNumber: m.lineNum, column: 1 });
+                                  }
+                                }}
+                              >
+                                <span style={{ color: '#38bdf8', marginRight: '6px' }}>L{m.lineNum}:</span>
+                                {m.lineText}
+                              </div>
+                            ))}
+                            {res.matchedLines.length > 5 && (
+                              <small style={{ color: 'var(--text-muted)', fontSize: '9px' }}>+{res.matchedLines.length - 5} more matches</small>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div style={{ padding: '24px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
+                      Type in the search box above to search code across all files
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 3. SOURCE CONTROL (GIT) PANE */}
+            {sidebarTab === 'git' && (
+              <div className="sidebar-pane">
+                <div className="sidebar-head">
+                  <span>SOURCE CONTROL</span>
+                  <button className="mini-btn" title="Close sidebar" onClick={() => setSidebar(false)}>
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <div className="sidebar-pane-body">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#60a5fa' }}>
+                      <GitBranch size={14} />
+                      <b>{branch}</b>
+                    </div>
+                    <button
+                      className="sidebar-btn-secondary"
+                      style={{ padding: '3px 8px', fontSize: '10px' }}
+                      onClick={() => { setView('github-sync'); if (window.innerWidth < 768) setSidebar(false); }}
+                    >
+                      <Cloud size={11} /> Cloud Sync
+                    </button>
+                  </div>
+
+                  <textarea
+                    className="sidebar-textarea"
+                    rows={2}
+                    value={gitMessage}
+                    onChange={e => setGitMessage(e.target.value)}
+                    placeholder="Commit message..."
+                  />
+
+                  <button className="sidebar-btn-primary" onClick={commit}>
+                    <Check size={14} /> Commit to '{branch}'
+                  </button>
+
+                  <div className="sidebar-section-title">
+                    CHANGES ({files.filter(f => f.modified).length})
+                  </div>
+
+                  {files.filter(f => f.modified).length > 0 ? (
+                    files.filter(f => f.modified).map(f => (
+                      <div key={f.id} className="sidebar-item-row" onClick={() => openFile(f.id)}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <FileCode2 size={13} />
+                          {f.name}
+                        </span>
+                        <span className="sidebar-badge modified">M</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '6px 10px' }}>
+                      ✓ Working tree is clean
+                    </div>
+                  )}
+
+                  <div className="sidebar-section-title">RECENT COMMITS</div>
+                  {gitHistory.slice(0, 5).map((x, i) => (
+                    <div key={`${x}-${i}`} style={{ padding: '6px 10px', fontSize: '11px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <GitCommit size={12} className="text-muted" />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x}</span>
+                      <small style={{ color: 'var(--text-muted)', fontSize: '9px' }}>{i === 0 ? 'latest' : `#${i + 1}`}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. RUN & DEBUG PANE */}
+            {sidebarTab === 'debug' && (
+              <div className="sidebar-pane">
+                <div className="sidebar-head">
+                  <span>RUN & DEBUG</span>
+                  <button className="mini-btn" title="Close sidebar" onClick={() => setSidebar(false)}>
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <div className="sidebar-pane-body">
+                  <button className="sidebar-btn-primary" onClick={handleRunCurrentCode}>
+                    <Play size={14} /> Run {active?.name || 'File'}
+                  </button>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    <button
+                      className="sidebar-btn-secondary"
+                      onClick={() => setSplitPreview(v => !v)}
+                    >
+                      <Columns size={12} /> {splitPreview ? 'Close Split' : 'Split Live'}
+                    </button>
+                    <button
+                      className="sidebar-btn-secondary"
+                      onClick={() => setPanel(v => !v)}
+                    >
+                      <Terminal size={12} /> Console Panel
+                    </button>
+                  </div>
+
+                  <div className="sidebar-section-title">ACTIVE ENVIRONMENT</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-main)', padding: '8px 10px', background: 'var(--bg-primary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div><b>Target:</b> {active?.name}</div>
+                    <div style={{ marginTop: '3px', color: 'var(--text-muted)' }}><b>Runtime:</b> {active?.language === 'python' ? 'Pyodide (Wasm)' : 'Browser V8'}</div>
+                    <div style={{ marginTop: '3px', color: hasTerminalError ? '#f87171' : '#4ade80' }}>
+                      <b>Status:</b> {hasTerminalError ? 'Error Detected' : 'Ready'}
+                    </div>
+                  </div>
+
+                  <div className="sidebar-section-title">CONSOLE OUTPUT PEEK</div>
+                  <div style={{ background: '#05070a', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px', fontSize: '10px', fontFamily: 'monospace', color: '#94a3b8', maxHeight: '140px', overflowY: 'auto' }}>
+                    {consoleLogs.length > 0 ? (
+                      consoleLogs.slice(-6).map((log, i) => (
+                        <div key={i} style={{ marginBottom: '3px', wordBreak: 'break-all' }}>{log}</div>
+                      ))
+                    ) : (
+                      <div style={{ color: 'var(--text-muted)' }}>No console output yet. Tap Run above.</div>
+                    )}
+                  </div>
+                  {consoleLogs.length > 0 && (
+                    <button
+                      className="sidebar-btn-secondary"
+                      style={{ fontSize: '10px', alignSelf: 'flex-start' }}
+                      onClick={() => setConsoleLogs([])}
+                    >
+                      Clear Console Logs
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 5. AI COPILOT PANE */}
+            {sidebarTab === 'ai' && (
+              <div className="sidebar-pane">
+                <div className="sidebar-head">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Sparkles size={14} className="text-blue-400" />
+                    <span>AI COPILOT</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button className="mini-btn" title="Full screen AI view" onClick={() => { setView('ai'); if (window.innerWidth < 768) setSidebar(false); }}>
+                      <Bot size={13} />
+                    </button>
+                    <button className="mini-btn" title="Close sidebar" onClick={() => setSidebar(false)}>
+                      <X size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="sidebar-pane-body" style={{ flex: 1, minHeight: 0 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    <button
+                      className="sidebar-chip"
+                      onClick={() => sendAiRequest(`Explain what ${active.name} does concisely.`)}
+                    >
+                      Explain file
+                    </button>
+                    <button
+                      className="sidebar-chip"
+                      onClick={() => sendAiRequest(`Check ${active.name} for bugs, edge cases, and performance issues.`)}
+                    >
+                      Find bugs
+                    </button>
+                    <button
+                      className="sidebar-chip"
+                      onClick={() => sendAiRequest(`Generate comprehensive unit tests for ${active.name}.`)}
+                    >
+                      Unit tests
+                    </button>
+                  </div>
+
+                  <div className="sidebar-ai-messages">
+                    {aiMessages.map((msg, idx) => (
+                      <div key={idx} className={`sidebar-ai-bubble ${msg.role}`}>
+                        {msg.content}
+                      </div>
+                    ))}
+                    {aiLoading && (
+                      <div className="sidebar-ai-bubble assistant" style={{ fontStyle: 'italic', color: '#93c5fd' }}>
+                        Thinking...
+                      </div>
+                    )}
+                  </div>
+
+                  <form
+                    onSubmit={e => {
+                      e.preventDefault();
+                      if (aiPrompt.trim() && !aiLoading) {
+                        sendAiRequest(aiPrompt);
+                      }
+                    }}
+                    style={{ display: 'flex', gap: '4px', marginTop: 'auto' }}
+                  >
+                    <input
+                      className="sidebar-textarea"
+                      style={{ height: '32px', padding: '6px 8px' }}
+                      value={aiPrompt}
+                      onChange={e => setAiPrompt(e.target.value)}
+                      placeholder="Ask AI about code..."
+                    />
+                    <button
+                      type="submit"
+                      disabled={aiLoading || !aiPrompt.trim()}
+                      className="sidebar-btn-primary"
+                      style={{ width: '36px', height: '32px', padding: 0 }}
+                      title="Send prompt"
+                    >
+                      <Send size={13} />
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* 6. EXTENSIONS PANE */}
+            {sidebarTab === 'extensions' && (
+              <div className="sidebar-pane">
+                <div className="sidebar-head">
+                  <span>EXTENSIONS</span>
+                  <button className="mini-btn" title="Close sidebar" onClick={() => setSidebar(false)}>
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <div className="sidebar-pane-body">
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {extensions.filter(e => e.installed).length} installed
+                  </div>
+                  {extensions.map(ext => (
+                    <div key={ext.id} className="sidebar-match-card" style={{ padding: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '11px', color: 'var(--text-main)' }}>{ext.name}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{ext.description}</div>
+                        </div>
+                        <button
+                          className={ext.installed ? 'sidebar-btn-secondary' : 'sidebar-btn-primary'}
+                          style={{ padding: '3px 8px', fontSize: '10px', width: 'auto' }}
+                          onClick={() =>
+                            setExtensions(prev =>
+                              prev.map(e => (e.id === ext.id ? { ...e, installed: !e.installed } : e))
+                            )
+                          }
+                        >
+                          {ext.installed ? 'Enabled' : 'Install'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 7. SETTINGS PANE */}
+            {sidebarTab === 'settings' && (
+              <div className="sidebar-pane">
+                <div className="sidebar-head">
+                  <span>SETTINGS</span>
+                  <button className="mini-btn" title="Close sidebar" onClick={() => setSidebar(false)}>
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <div className="sidebar-pane-body">
+                  <div className="sidebar-section-title">THEME & APPEARANCE</div>
+                  <div className="sidebar-setting-row">
+                    <span>Theme</span>
+                    <select
+                      className="select-dropdown"
+                      style={{ padding: '3px 6px', fontSize: '11px' }}
+                      value={theme}
+                      onChange={e => setTheme(e.target.value as ThemeName)}
+                    >
+                      <option value="vs-dark">VS Code Dark</option>
+                      <option value="light">VS Code Light</option>
+                      <option value="dracula">Dracula</option>
+                      <option value="one-dark-pro">One Dark Pro</option>
+                      <option value="monokai">Monokai</option>
+                      <option value="synthwave-84">Synthwave '84</option>
+                    </select>
+                  </div>
+
+                  <div className="sidebar-setting-row">
+                    <span>Font Size</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <button className="mini-btn" onClick={() => setFontSize(v => Math.max(11, v - 1))}>−</button>
+                      <b style={{ fontSize: '11px' }}>{fontSize}px</b>
+                      <button className="mini-btn" onClick={() => setFontSize(v => Math.min(22, v + 1))}>+</button>
+                    </div>
+                  </div>
+
+                  <div className="sidebar-setting-row">
+                    <span>Word Wrap</span>
+                    <button
+                      className="sidebar-btn-secondary"
+                      style={{ padding: '2px 8px', fontSize: '10px' }}
+                      onClick={() => setWordWrap(v => !v)}
+                    >
+                      {wordWrap ? 'On' : 'Off'}
+                    </button>
+                  </div>
+
+                  <div className="sidebar-section-title">ADVANCED</div>
+                  <button
+                    className="sidebar-btn-secondary"
+                    onClick={() => { setView('settings'); if (window.innerWidth < 768) setSidebar(false); }}
+                  >
+                    <Settings size={12} /> Open Full Settings
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Persistent Sidebar Bottom Status */}
             <div className="sidebar-bottom">
-              <button onClick={() => setView('git')}>
+              <button onClick={() => { setView('git'); if (window.innerWidth < 768) setSidebar(false); }}>
                 <GitBranch size={14} /> {branch}
               </button>
               <span>

@@ -1160,10 +1160,10 @@ button, input, textarea, select {
   border: 0;
 }
 
-/* Quick Symbol Keyboard Toolbar */
+/* Quick Symbol Keyboard Toolbar & Touch Navigation */
 .quick-symbol-bar {
-  height: 38px;
-  flex: 0 0 38px;
+  height: 42px;
+  flex: 0 0 42px;
   background: var(--bg-secondary, #11151b);
   border-top: 1px solid var(--border-color, #252b34);
   display: flex;
@@ -1173,16 +1173,29 @@ button, input, textarea, select {
   overflow-x: auto;
   scrollbar-width: none;
   z-index: 10;
+  -webkit-overflow-scrolling: touch;
+  user-select: none;
 }
 
 .quick-symbol-bar::-webkit-scrollbar {
   display: none;
 }
 
+.symbol-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 2px 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
 .symbol-btn {
-  height: 28px;
-  min-width: 32px;
-  padding: 0 7px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 6px;
   border: 1px solid var(--border-color, #252f3d);
   background: var(--bg-tertiary, #171e28);
   color: var(--text-main, #dce2eb);
@@ -1190,25 +1203,83 @@ button, input, textarea, select {
   font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 12px;
   font-weight: 600;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.12s ease;
+  touch-action: manipulation;
+  flex-shrink: 0;
+}
+
+.symbol-btn:hover {
+  background: var(--bg-hover, #202938);
+  border-color: var(--accent, #1683ff);
 }
 
 .symbol-btn:active {
   background: var(--accent, #1683ff);
-  color: white;
-  transform: scale(0.95);
+  color: #fff;
+  transform: scale(0.92);
+}
+
+.symbol-btn.nav-btn {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+  min-width: 29px;
+  padding: 0 5px;
+}
+
+.symbol-btn.nav-btn:hover {
+  background: rgba(59, 130, 246, 0.24);
+  color: #bfdbfe;
+}
+
+.symbol-btn.nav-btn:active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.symbol-btn.action-btn {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.3);
+  color: #d8b4fe;
+  padding: 0 6px;
+}
+
+.symbol-btn.action-btn:hover {
+  background: rgba(168, 85, 247, 0.24);
+  color: #f3e8ff;
+}
+
+.symbol-btn.action-btn:active {
+  background: #9333ea;
+  color: #ffffff;
+}
+
+.symbol-btn.code-chip {
+  min-width: 28px;
+  padding: 0 8px;
+  background: var(--bg-tertiary, #171e28);
+}
+
+.btn-label-text {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
 }
 
 .undo-btn, .redo-btn {
   background: var(--bg-primary, #0c1015);
+  border-color: var(--border-color, #252b34);
 }
 
 .symbol-divider {
   width: 1px;
-  height: 18px;
+  height: 20px;
   background: var(--border-color, #252b34);
   margin: 0 2px;
   flex-shrink: 0;

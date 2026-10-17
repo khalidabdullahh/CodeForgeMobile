@@ -8,6 +8,12 @@ const Editor: any = (MonacoEditorRaw as any)?.default || MonacoEditorNamed || Mo
 
 import {
   Archive,
+  ArrowDown,
+  ArrowLeft,
+  ArrowLeftToLine,
+  ArrowRight,
+  ArrowRightToLine,
+  ArrowUp,
   Bot,
   Check,
   ChevronDown,
@@ -16,6 +22,7 @@ import {
   Code2,
   Columns,
   Copy,
+  CopyPlus,
   Download,
   FileCode2,
   FilePlus2,
@@ -27,11 +34,13 @@ import {
   GitCommit,
   Github,
   Home,
+  Indent,
   Keyboard,
   Layers,
   Menu,
   Mic,
   MicOff,
+  Outdent,
   Package,
   Palette,
   Pin,
@@ -45,6 +54,7 @@ import {
   Send,
   Settings,
   Share2,
+  Slash,
   Smartphone,
   Sparkles,
   Terminal,
@@ -606,6 +616,7 @@ const quickSymbols = [
   { label: ':', insert: ':' },
   { label: '=', insert: ' = ' },
   { label: '===', insert: ' === ' },
+  { label: '!==', insert: ' !== ' },
   { label: '+', insert: ' + ' },
   { label: '-', insert: ' - ' },
   { label: '*', insert: ' * ' },
@@ -618,8 +629,8 @@ const quickSymbols = [
   { label: '&&', insert: ' && ' },
   { label: '||', insert: ' || ' },
   { label: '?.', insert: '?.' },
-  { label: 'Tab', insert: 'Tab' },
-  { label: '//', insert: '// ' }
+  { label: '_', insert: '_' },
+  { label: '@', insert: '@' }
 ];
 
 function languageFor(name: string) {
@@ -1336,12 +1347,89 @@ function App() {
     } else if (item.wrap && item.insert.length === 2) {
       const left = item.insert[0];
       const right = item.insert[1];
-      const newText = selectedText ? `${left}${selectedText}${right}` : `${left}${right}`;
-      editor.executeEdits('quick-symbol', [{ range: selection, text: newText, forceMoveMarkers: true }]);
+      if (selectedText) {
+        editor.executeEdits('quick-symbol', [{ range: selection, text: `${left}${selectedText}${right}`, forceMoveMarkers: true }]);
+      } else {
+        editor.executeEdits('quick-symbol', [{ range: selection, text: `${left}${right}`, forceMoveMarkers: true }]);
+        const pos = editor.getPosition();
+        if (pos) {
+          editor.setPosition({ lineNumber: pos.lineNumber, column: pos.column - 1 });
+        }
+      }
     } else {
       editor.executeEdits('quick-symbol', [{ range: selection, text: item.insert, forceMoveMarkers: true }]);
     }
     editor.focus();
+  };
+
+  // Touch Cursor Navigation
+  const handleCursorMove = (direction: 'left' | 'right' | 'up' | 'down' | 'home' | 'end') => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const commandMap: Record<string, string> = {
+      left: 'cursorLeft',
+      right: 'cursorRight',
+      up: 'cursorUp',
+      down: 'cursorDown',
+      home: 'cursorHome',
+      end: 'cursorEnd',
+    };
+    const cmd = commandMap[direction];
+    if (cmd) {
+      editor.trigger('touch-cursor', cmd, null);
+      const pos = editor.getPosition();
+      if (pos) {
+        editor.revealPositionInCenterIfOutsideViewport(pos);
+      }
+    }
+  };
+
+  // VS Code Quick Editing Actions
+  const handleTabAction = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    editor.trigger('touch-action', 'tab', null);
+  };
+
+  const handleOutdentAction = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    editor.trigger('touch-action', 'outdent', null);
+  };
+
+  const handleCommentToggle = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const action = editor.getAction('editor.action.commentLine');
+    if (action) {
+      action.run();
+    }
+  };
+
+  const handleDuplicateLine = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const action = editor.getAction('editor.action.copyLinesDownAction');
+    if (action) {
+      action.run();
+    }
+  };
+
+  const handleSelectExpand = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const action = editor.getAction('editor.action.smartSelect.expand') || editor.getAction('expandLineSelection');
+    if (action) {
+      action.run();
+    } else {
+      editor.trigger('touch-action', 'expandLineSelection', null);
+    }
   };
 
   const handleUndo = () => {
@@ -3365,21 +3453,124 @@ if 'matplotlib.pyplot' in sys.modules:
                 )}
               </div>
 
-              {/* Mobile Quick Symbol Access Bar + Voice Mic Button */}
+              {/* Mobile Quick Symbol Access & Touch Navigation Toolbar */}
               <div className="quick-symbol-bar">
+                {/* D-Pad Touch Cursor Navigation */}
+                <div className="symbol-group nav-group" title="Touch Cursor Navigation">
+                  <button
+                    className="symbol-btn nav-btn"
+                    title="Line Start (Home)"
+                    onMouseDown={(e) => { e.preventDefault(); handleCursorMove('home'); }}
+                  >
+                    <ArrowLeftToLine size={13} />
+                  </button>
+                  <button
+                    className="symbol-btn nav-btn"
+                    title="Cursor Left (←)"
+                    onMouseDown={(e) => { e.preventDefault(); handleCursorMove('left'); }}
+                  >
+                    <ArrowLeft size={13} />
+                  </button>
+                  <button
+                    className="symbol-btn nav-btn"
+                    title="Cursor Up (↑)"
+                    onMouseDown={(e) => { e.preventDefault(); handleCursorMove('up'); }}
+                  >
+                    <ArrowUp size={13} />
+                  </button>
+                  <button
+                    className="symbol-btn nav-btn"
+                    title="Cursor Down (↓)"
+                    onMouseDown={(e) => { e.preventDefault(); handleCursorMove('down'); }}
+                  >
+                    <ArrowDown size={13} />
+                  </button>
+                  <button
+                    className="symbol-btn nav-btn"
+                    title="Cursor Right (→)"
+                    onMouseDown={(e) => { e.preventDefault(); handleCursorMove('right'); }}
+                  >
+                    <ArrowRight size={13} />
+                  </button>
+                  <button
+                    className="symbol-btn nav-btn"
+                    title="Line End (End)"
+                    onMouseDown={(e) => { e.preventDefault(); handleCursorMove('end'); }}
+                  >
+                    <ArrowRightToLine size={13} />
+                  </button>
+                </div>
+
+                <div className="symbol-divider" />
+
+                {/* VS Code Quick Editing Actions */}
+                <div className="symbol-group actions-group" title="VS Code Quick Actions">
+                  <button
+                    className="symbol-btn action-btn"
+                    title="Tab Indent"
+                    onMouseDown={(e) => { e.preventDefault(); handleTabAction(); }}
+                  >
+                    <Indent size={13} />
+                    <span className="btn-label-text">Tab</span>
+                  </button>
+                  <button
+                    className="symbol-btn action-btn"
+                    title="Outdent (Shift+Tab)"
+                    onMouseDown={(e) => { e.preventDefault(); handleOutdentAction(); }}
+                  >
+                    <Outdent size={13} />
+                  </button>
+                  <button
+                    className="symbol-btn action-btn"
+                    title="Toggle Comment (Ctrl+/)"
+                    onMouseDown={(e) => { e.preventDefault(); handleCommentToggle(); }}
+                  >
+                    <Slash size={13} />
+                  </button>
+                  <button
+                    className="symbol-btn action-btn"
+                    title="Duplicate Line (Alt+Shift+Down)"
+                    onMouseDown={(e) => { e.preventDefault(); handleDuplicateLine(); }}
+                  >
+                    <CopyPlus size={13} />
+                  </button>
+                  <button
+                    className="symbol-btn action-btn"
+                    title="Expand Selection / Select Word"
+                    onMouseDown={(e) => { e.preventDefault(); handleSelectExpand(); }}
+                  >
+                    <span className="btn-label-text">Select</span>
+                  </button>
+                </div>
+
+                <div className="symbol-divider" />
+
+                {/* History & Voice Tools */}
+                <button
+                  className="symbol-btn undo-btn"
+                  title="Undo (Ctrl+Z)"
+                  onMouseDown={(e) => { e.preventDefault(); handleUndo(); }}
+                >
+                  <Undo2 size={13} />
+                </button>
+                <button
+                  className="symbol-btn redo-btn"
+                  title="Redo (Ctrl+Y)"
+                  onMouseDown={(e) => { e.preventDefault(); handleRedo(); }}
+                >
+                  <RotateCw size={13} />
+                </button>
                 <button
                   className={`symbol-btn mic-btn ${isRecordingVoice ? 'recording' : ''}`}
                   title={isRecordingVoice ? 'Listening... Speak code' : 'Voice Dictation'}
                   onClick={toggleVoiceRecognition}
                 >
-                  {isRecordingVoice ? <MicOff size={14} className="text-red-400 animate-pulse" /> : <Mic size={14} />}
+                  {isRecordingVoice ? <MicOff size={13} className="text-red-400 animate-pulse" /> : <Mic size={13} />}
                 </button>
-                <button className="symbol-btn undo-btn" title="Undo" onClick={handleUndo}>
-                  <Undo2 size={14} />
-                </button>
-                <button className="symbol-btn redo-btn" title="Redo" onClick={handleRedo}>
-                  <RotateCw size={14} />
-                </button>
+
+                <div className="symbol-divider" />
+
+                {/* Snippets / Symbols Switcher */}
                 <button
                   className="symbol-mode-toggle"
                   title="Switch between General Symbols and Language Keywords/Snippets"
@@ -3388,9 +3579,16 @@ if 'matplotlib.pyplot' in sys.modules:
                   <Sparkles size={11} />
                   <span>{toolbarMode === 'symbols' ? 'Snippets' : 'Symbols'}</span>
                 </button>
+
                 <div className="symbol-divider" />
+
+                {/* Symbols / Snippets Chips */}
                 {(toolbarMode === 'symbols' ? quickSymbols : getLanguageSnippets(active?.language || 'plaintext')).map((s, idx) => (
-                  <button key={idx} className="symbol-btn" onClick={() => handleInsertSymbol(s)}>
+                  <button
+                    key={idx}
+                    className="symbol-btn code-chip"
+                    onMouseDown={(e) => { e.preventDefault(); handleInsertSymbol(s); }}
+                  >
                     {s.label}
                   </button>
                 ))}

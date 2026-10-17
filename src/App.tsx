@@ -11,6 +11,7 @@ import {
   Bot,
   Check,
   ChevronDown,
+  ChevronRight,
   Cloud,
   Code2,
   Columns,
@@ -33,6 +34,7 @@ import {
   MicOff,
   Package,
   Palette,
+  Pin,
   Play,
   Plus,
   Radio,
@@ -806,6 +808,19 @@ function App() {
   const multiFileInputRef = useRef<HTMLInputElement>(null);
   const zipFileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+
+  // Sticky Scroll & Breadcrumbs
+  const [stickyScroll, setStickyScroll] = useState<boolean>(() => {
+    return localStorage.getItem('codeforge-sticky-scroll') !== 'false';
+  });
+  const [breadcrumbsEnabled, setBreadcrumbsEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('codeforge-breadcrumbs') !== 'false';
+  });
+  const [currentCursor, setCurrentCursor] = useState<{ line: number; column: number }>({ line: 1, column: 1 });
+  const [currentSymbol, setCurrentSymbol] = useState<string | null>(null);
+  const [showBreadcrumbsMenu, setShowBreadcrumbsMenu] = useState(false);
+
   // Mobile Toolbar Mode (Symbols vs Language Snippets)
   const [toolbarMode, setToolbarMode] = useState<'symbols' | 'snippets'>('symbols');
 
@@ -907,6 +922,52 @@ function App() {
     } catch {}
   }, [ghToken]);
   useEffect(() => localStorage.setItem('codeforge-gh-repo', ghRepoInput), [ghRepoInput]);
+  useEffect(() => localStorage.setItem('codeforge-sticky-scroll', String(stickyScroll)), [stickyScroll]);
+  useEffect(() => localStorage.setItem('codeforge-breadcrumbs', String(breadcrumbsEnabled)), [breadcrumbsEnabled]);
+
+  const detectSymbolAtLine = (content: string, language: string, targetLine: number): string | null => {
+    if (!content) return null;
+    const lines = content.split('\n');
+    const lineIndex = Math.min(Math.max(0, targetLine - 1), lines.length - 1);
+
+    for (let i = lineIndex; i >= 0 && i >= lineIndex - 60; i--) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      if (language === 'python') {
+        const defMatch = line.match(/^def\s+([a-zA-Z0-9_]+)\s*\(/);
+        if (defMatch) return `def ${defMatch[1]}()`;
+        const classMatch = line.match(/^class\s+([a-zA-Z0-9_]+)/);
+        if (classMatch) return `class ${classMatch[1]}`;
+      } else if (language === 'javascript' || language === 'typescript') {
+        const fnMatch = line.match(/(?:function\s+([a-zA-Z0-9_]+)|(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_]+)\s*=>)/);
+        if (fnMatch) return `${fnMatch[1] || fnMatch[2]}()`;
+        const methodMatch = line.match(/^([a-zA-Z0-9_]+)\s*\([^)]*\)\s*\{/);
+        if (methodMatch && !['if', 'for', 'while', 'switch', 'catch'].includes(methodMatch[1])) {
+          return `${methodMatch[1]}()`;
+        }
+        const classMatch = line.match(/^class\s+([a-zA-Z0-9_]+)/);
+        if (classMatch) return `class ${classMatch[1]}`;
+      } else if (language === 'html') {
+        const tagMatch = line.match(/<([a-zA-Z0-9\-]+)(?:\s+[^>]*class=["']([^"']+)["'])?[^>]*>/);
+        if (tagMatch && !tagMatch[0].endsWith('/>') && !['meta', 'link', 'br', 'hr', 'img', 'input'].includes(tagMatch[1].toLowerCase())) {
+          return tagMatch[2] ? `<${tagMatch[1]}.${tagMatch[2].split(' ')[0]}>` : `<${tagMatch[1]}>`;
+        }
+      } else if (language === 'css') {
+        const selMatch = line.match(/^([.#a-zA-Z0-9_\-\s,>:+]+)\s*\{/);
+        if (selMatch) return selMatch[1].trim();
+      }
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    if (active) {
+      const sym = detectSymbolAtLine(active.content, active.language, currentCursor.line);
+      setCurrentSymbol(sym);
+    }
+  }, [active?.id, active?.content, currentCursor.line]);
+
 
   // Track orientation changes
   useEffect(() => {
@@ -1077,6 +1138,12 @@ function App() {
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+
+    editor.onDidChangeCursorPosition((e: any) => {
+      setCurrentCursor({ line: e.position.lineNumber, column: e.position.column });
+      const sym = detectSymbolAtLine(editor.getValue(), active?.language || 'plaintext', e.position.lineNumber);
+      setCurrentSymbol(sym);
+    });
 
     // Define custom themes
     monaco.editor.defineTheme('dracula', {
@@ -1563,7 +1630,7 @@ if 'matplotlib.pyplot' in sys.modules:
       setTimeout(() => {
         const printMatches = liveCode.match(/(?:printf\s*\(\s*"(.*?)"|cout\s*<<\s*"(.*?)")/g);
         if (printMatches && printMatches.length) {
-          printMatches.forEach(m => {
+          printMatches.forEach((m: string) => {
             const clean = m.replace(/printf\s*\(\s*"|"|\)|cout\s*<<\s*|<<\s*endl|;/g, '').replace(/\\n/g, '');
             if (clean) setTerminal(prev => `${prev}\n${clean}`);
           });
@@ -1579,7 +1646,7 @@ if 'matplotlib.pyplot' in sys.modules:
       setTimeout(() => {
         const sysout = liveCode.match(/System\.out\.println\s*\(\s*"(.*?)"\s*\)/g);
         if (sysout && sysout.length) {
-          sysout.forEach(s => {
+          sysout.forEach((s: string) => {
             const str = s.replace(/System\.out\.println\s*\(\s*"|"\s*\)/g, '');
             setTerminal(prev => `${prev}\n${str}`);
           });
@@ -2070,7 +2137,7 @@ if 'matplotlib.pyplot' in sys.modules:
         let indent = 0;
         formatted = content
           .split('\n')
-          .map(line => {
+          .map((line: string) => {
             const trimmed = line.trim();
             if (!trimmed) return '';
             if (trimmed.startsWith('}') || trimmed.startsWith(']') || trimmed.startsWith(')')) {
@@ -2088,7 +2155,7 @@ if 'matplotlib.pyplot' in sys.modules:
         let indent = 0;
         formatted = content
           .split('\n')
-          .map(line => {
+          .map((line: string) => {
             const trimmed = line.trim();
             if (!trimmed) return '';
             if (trimmed.startsWith('</') || trimmed.startsWith('-->')) {
@@ -2116,11 +2183,11 @@ if 'matplotlib.pyplot' in sys.modules:
       } else {
         formatted = content
           .split('\n')
-          .map(line => line.trimEnd())
+          .map((line: string) => line.trimEnd())
           .join('\n');
       }
     } catch {
-      formatted = content.split('\n').map(line => line.trimEnd()).join('\n');
+      formatted = content.split('\n').map((line: string) => line.trimEnd()).join('\n');
     }
 
     updateContent(formatted);
@@ -3060,6 +3127,28 @@ if 'matplotlib.pyplot' in sys.modules:
                     </button>
                   </div>
 
+                  <div className="sidebar-setting-row">
+                    <span>Sticky Scroll</span>
+                    <button
+                      className="sidebar-btn-secondary"
+                      style={{ padding: '2px 8px', fontSize: '10px' }}
+                      onClick={() => setStickyScroll(v => !v)}
+                    >
+                      {stickyScroll ? 'On' : 'Off'}
+                    </button>
+                  </div>
+
+                  <div className="sidebar-setting-row">
+                    <span>Breadcrumbs</span>
+                    <button
+                      className="sidebar-btn-secondary"
+                      style={{ padding: '2px 8px', fontSize: '10px' }}
+                      onClick={() => setBreadcrumbsEnabled(v => !v)}
+                    >
+                      {breadcrumbsEnabled ? 'On' : 'Off'}
+                    </button>
+                  </div>
+
                   <div className="sidebar-section-title">ADVANCED</div>
                   <button
                     className="sidebar-btn-secondary"
@@ -3138,6 +3227,81 @@ if 'matplotlib.pyplot' in sys.modules:
                 </div>
               </div>
 
+              {/* VS Code Breadcrumbs Bar */}
+              {breadcrumbsEnabled && (
+                <div className="editor-breadcrumbs">
+                  <div className="breadcrumb-trail">
+                    <span className="breadcrumb-item root" onClick={() => setSidebar(true)} title="Show Explorer">
+                      <FolderOpen size={13} className="text-muted" />
+                      <span>codeforge-workspace</span>
+                    </span>
+                    <ChevronRight size={12} className="breadcrumb-separator" />
+
+                    <div className="breadcrumb-item file-item" onClick={() => setShowBreadcrumbsMenu(v => !v)}>
+                      <FileCode2 size={13} className="text-blue-400" />
+                      <span className="breadcrumb-name">{active?.name}</span>
+                      <ChevronDown size={11} className="breadcrumb-dropdown-arrow" />
+
+                      {showBreadcrumbsMenu && (
+                        <div className="breadcrumb-dropdown" onClick={e => e.stopPropagation()}>
+                          <div className="breadcrumb-dropdown-header">FILES IN WORKSPACE</div>
+                          <div className="breadcrumb-dropdown-list">
+                            {files.map(f => (
+                              <div
+                                key={f.id}
+                                className={`breadcrumb-dropdown-row ${f.id === active?.id ? 'active' : ''}`}
+                                onClick={() => {
+                                  openFile(f.id);
+                                  setShowBreadcrumbsMenu(false);
+                                }}
+                              >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <FileCode2 size={13} />
+                                  <span>{f.path}</span>
+                                </span>
+                                {f.modified && <span className="sidebar-badge modified">M</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {currentSymbol && (
+                      <>
+                        <ChevronRight size={12} className="breadcrumb-separator" />
+                        <span
+                          className="breadcrumb-item symbol-item"
+                          title="Current Function / Scope"
+                          onClick={() => {
+                            if (editorRef.current) {
+                              editorRef.current.focus();
+                            }
+                          }}
+                        >
+                          <Code2 size={12} className="text-purple-400" />
+                          <span className="breadcrumb-symbol">{currentSymbol}</span>
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="breadcrumb-actions">
+                    <button
+                      className={`breadcrumb-pill ${stickyScroll ? 'active' : ''}`}
+                      title={stickyScroll ? 'Sticky Scroll Enabled' : 'Sticky Scroll Disabled'}
+                      onClick={() => setStickyScroll(v => !v)}
+                    >
+                      <Pin size={10} />
+                      <span>Sticky</span>
+                    </button>
+                    <span className="breadcrumb-pos">
+                      Ln {currentCursor.line}, Col {currentCursor.column}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className={`editor-container ${splitPreview ? 'split-mode' : ''}`}>
                 <div className="monaco-wrap">
                   <Editor
@@ -3146,7 +3310,7 @@ if 'matplotlib.pyplot' in sys.modules:
                     language={active?.language || 'plaintext'}
                     value={active?.content || ''}
                     onMount={handleEditorDidMount}
-                    onChange={value => updateContent(value ?? '')}
+                    onChange={(value: string | undefined) => updateContent(value ?? '')}
                     options={{
                       minimap: { enabled: false },
                       fontSize,
@@ -3161,10 +3325,28 @@ if 'matplotlib.pyplot' in sys.modules:
                       smoothScrolling: true,
                       cursorBlinking: 'smooth',
                       bracketPairColorization: { enabled: true },
-                      guides: { bracketPairs: true },
+                      guides: {
+                        bracketPairs: true,
+                        bracketPairsHorizontal: true,
+                        highlightActiveBracketPair: true,
+                        indentation: true,
+                        highlightActiveIndentation: true
+                      },
+                      folding: true,
+                      foldingStrategy: 'auto',
+                      showFoldingControls: 'always',
+                      foldingHighlight: true,
+                      unfoldOnClickAfterEndOfLine: true,
+                      stickyScroll: {
+                        enabled: stickyScroll,
+                        maxLineCount: 5
+                      },
+                      renderLineHighlight: 'all',
+                      renderLineHighlightOnlyWhenFocus: false,
+                      glyphMargin: true,
                       lineNumbersMinChars: 3
                     }}
-                    onValidate={markers =>
+                    onValidate={(markers: any[]) =>
                       setDiagnostics(markers.length ? `${markers.length} diagnostic${markers.length > 1 ? 's' : ''} detected.` : 'No problems detected.')
                     }
                   />
@@ -3614,6 +3796,20 @@ if 'matplotlib.pyplot' in sys.modules:
                 <span>Word Wrap</span>
                 <button className={`toggle ${wordWrap ? 'on' : ''}`} onClick={() => setWordWrap(v => !v)}>
                   {wordWrap ? 'On' : 'Off'}
+                </button>
+              </div>
+
+              <div className="setting-row">
+                <span>Sticky Scroll</span>
+                <button className={`toggle ${stickyScroll ? 'on' : ''}`} onClick={() => setStickyScroll(v => !v)}>
+                  {stickyScroll ? 'On' : 'Off'}
+                </button>
+              </div>
+
+              <div className="setting-row">
+                <span>Breadcrumbs Navigation</span>
+                <button className={`toggle ${breadcrumbsEnabled ? 'on' : ''}`} onClick={() => setBreadcrumbsEnabled(v => !v)}>
+                  {breadcrumbsEnabled ? 'On' : 'Off'}
                 </button>
               </div>
 

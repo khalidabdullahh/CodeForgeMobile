@@ -1355,36 +1355,262 @@ button, input, textarea, select {
   font: 12px monospace;
 }
 
-/* Status Bar */
+/* VS Code Interactive Status Bar */
 .statusbar {
-  height: 24px;
-  flex: 0 0 24px;
+  height: 26px;
+  flex: 0 0 26px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 10px;
-  background: var(--accent, #1683ff);
-  color: white;
-  font-size: 10px;
+  padding: 0 8px;
+  background: var(--bg-statusbar, #1683ff);
+  color: #ffffff;
+  font-size: 11px;
+  user-select: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+  z-index: 20;
+  border-top: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.statusbar::-webkit-scrollbar {
+  display: none;
 }
 
 .status-left, .status-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
 .status-btn {
-  color: white;
+  color: rgba(255, 255, 255, 0.92);
   display: inline-flex;
   gap: 4px;
   align-items: center;
-  padding: 2px 5px;
+  padding: 2px 7px;
   border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  white-space: nowrap;
+  transition: all 0.12s ease;
+  touch-action: manipulation;
 }
 
 .status-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.status-btn:active {
+  background: rgba(255, 255, 255, 0.35);
+  transform: scale(0.96);
+}
+
+.status-btn.diagnostics-btn {
+  display: inline-flex;
+  gap: 6px;
+  padding: 1px 6px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.diag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  font-size: 10.5px;
+}
+
+.diag-pill.error-pill {
+  color: #fca5a5;
+}
+
+.diag-pill.warn-pill {
+  color: #fde047;
+}
+
+.status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 5px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.status-sync-icon {
+  margin-left: 2px;
+  opacity: 0.8;
+}
+
+.active-panel-btn {
+  background: rgba(0, 0, 0, 0.3) !important;
+}
+
+.ai-status-btn {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.3)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Problems Panel List */
+.problems-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--bg-primary, #090c10);
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+.problem-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-secondary, #11151b);
+  border: 1px solid var(--border-color, #202734);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.problem-item:hover {
+  background: var(--bg-tertiary, #171e28);
+  border-color: var(--accent, #1683ff);
+}
+
+.problem-item:active {
+  transform: scale(0.99);
+}
+
+.problem-msg {
+  flex: 1;
+  color: var(--text-main, #dce2eb);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.problem-loc {
+  color: var(--text-muted, #717d8f);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.problems-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  color: var(--text-muted, #717d8f);
+  font-size: 12.5px;
+}
+
+.problems-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.tab-error-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #f87171;
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.tab-warn-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #fbbf24;
+  font-weight: 600;
+  font-size: 10px;
+}
+
+/* Language and Indent Pickers */
+.language-list-scroll {
+  max-height: 290px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 4px;
+}
+
+.language-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #11151b);
+  border: 1px solid var(--border-color, #202734);
+  border-radius: 8px;
+  color: var(--text-main, #dce2eb);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all 0.12s ease;
+  font-family: inherit;
+}
+
+.language-select-item:hover {
+  background: var(--bg-tertiary, #171e28);
+  border-color: var(--accent, #1683ff);
+}
+
+.language-select-item.active-lang {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: #3b82f6;
+}
+
+.lang-item-name {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.lang-item-ext {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-muted, #717d8f);
+}
+
+.indent-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.format-action-btn {
+  background: rgba(99, 102, 241, 0.1) !important;
+  border-color: rgba(99, 102, 241, 0.25) !important;
+}
+
+@media (max-width: 640px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .hide-on-tiny-screen {
+    display: none !important;
+  }
 }
 
 /* Full Views (Preview, AI, Git, Settings) */

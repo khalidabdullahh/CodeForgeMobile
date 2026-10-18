@@ -7,6 +7,8 @@ const Editor: any = (MonacoEditorRaw as any)?.default || MonacoEditorNamed || Mo
 
 
 import {
+  AlertCircle,
+  AlertTriangle,
   Archive,
   ArrowDown,
   ArrowLeft,
@@ -16,6 +18,7 @@ import {
   ArrowUp,
   Bot,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Cloud,
@@ -42,7 +45,6 @@ import {
   MicOff,
   Outdent,
   Package,
-  Palette,
   Pin,
   Play,
   Plus,
@@ -682,6 +684,33 @@ function languageFor(name: string) {
   );
 }
 
+const AVAILABLE_LANGUAGES = [
+  { id: 'typescript', name: 'TypeScript', ext: '.ts' },
+  { id: 'javascript', name: 'JavaScript', ext: '.js' },
+  { id: 'html', name: 'HTML5', ext: '.html' },
+  { id: 'css', name: 'CSS3', ext: '.css' },
+  { id: 'scss', name: 'SCSS', ext: '.scss' },
+  { id: 'python', name: 'Python', ext: '.py' },
+  { id: 'json', name: 'JSON', ext: '.json' },
+  { id: 'markdown', name: 'Markdown', ext: '.md' },
+  { id: 'sql', name: 'SQL', ext: '.sql' },
+  { id: 'cpp', name: 'C++', ext: '.cpp' },
+  { id: 'c', name: 'C', ext: '.c' },
+  { id: 'csharp', name: 'C#', ext: '.cs' },
+  { id: 'java', name: 'Java', ext: '.java' },
+  { id: 'kotlin', name: 'Kotlin', ext: '.kt' },
+  { id: 'rust', name: 'Rust', ext: '.rs' },
+  { id: 'go', name: 'Go', ext: '.go' },
+  { id: 'php', name: 'PHP', ext: '.php' },
+  { id: 'ruby', name: 'Ruby', ext: '.rb' },
+  { id: 'swift', name: 'Swift', ext: '.swift' },
+  { id: 'dart', name: 'Dart', ext: '.dart' },
+  { id: 'shell', name: 'Shell Script', ext: '.sh' },
+  { id: 'yaml', name: 'YAML', ext: '.yaml' },
+  { id: 'xml', name: 'XML', ext: '.xml' },
+  { id: 'plaintext', name: 'Plain Text', ext: '.txt' },
+];
+
 const themeBgMap: Record<ThemeName, string> = {
   'vs-dark': '#0b0e12',
   'light': '#f8fafc',
@@ -837,7 +866,31 @@ function App() {
 
   // Matplotlib Python Plot Image State
   const [plotImage, setPlotImage] = useState<string | null>(null);
-  const [panelTab, setPanelTab] = useState<'terminal' | 'logs' | 'plot'>('terminal');
+  const [panelTab, setPanelTab] = useState<'terminal' | 'logs' | 'plot' | 'problems'>('terminal');
+
+  // Diagnostics & Problems tracking
+  const [editorMarkers, setEditorMarkers] = useState<any[]>([]);
+  const errorCount = useMemo(() => editorMarkers.filter(m => m.severity === 8).length, [editorMarkers]);
+  const warningCount = useMemo(() => editorMarkers.filter(m => m.severity === 4).length, [editorMarkers]);
+
+  // Indentation Settings
+  const [indentSettings, setIndentSettings] = useState<{ tabSize: number; insertSpaces: boolean }>(() => {
+    const saved = localStorage.getItem('codeforge-indent');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return { tabSize: 2, insertSpaces: true };
+  });
+
+  // Line Sequence Endings
+  const [lineEnding, setLineEnding] = useState<'LF' | 'CRLF'>('LF');
+
+  // Status Bar Pickers & Modals
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [langSearchQuery, setLangSearchQuery] = useState('');
+  const [showIndentPicker, setShowIndentPicker] = useState(false);
+  const [showGoToLine, setShowGoToLine] = useState(false);
+  const [goToLineInput, setGoToLineInput] = useState('');
 
   // Instant Share Modal State
   const [showShareModal, setShowShareModal] = useState(false);
@@ -1440,6 +1493,71 @@ function App() {
   const handleRedo = () => {
     editorRef.current?.trigger('quick-symbol', 'redo', null);
     editorRef.current?.focus();
+  };
+
+  const applyIndentation = (tabSize: number, insertSpaces: boolean) => {
+    const next = { tabSize, insertSpaces };
+    setIndentSettings(next);
+    localStorage.setItem('codeforge-indent', JSON.stringify(next));
+    if (editorRef.current) {
+      const model = editorRef.current.getModel();
+      if (model) {
+        model.updateOptions({ tabSize, insertSpaces });
+      }
+    }
+    setShowIndentPicker(false);
+    setTerminal(prev => `${prev}\n✓ Indentation set to: ${insertSpaces ? `Spaces: ${tabSize}` : `Tab Size: ${tabSize}`}`);
+  };
+
+  const toggleLineEnding = () => {
+    const next = lineEnding === 'LF' ? 'CRLF' : 'LF';
+    setLineEnding(next);
+    if (editorRef.current && (window as any).monaco) {
+      const model = editorRef.current.getModel();
+      if (model) {
+        const eol = next === 'LF'
+          ? (window as any).monaco.editor.EndOfLineSequence.LF
+          : (window as any).monaco.editor.EndOfLineSequence.CRLF;
+        model.setEOL(eol);
+      }
+    }
+    setTerminal(prev => `${prev}\n✓ Line endings set to: ${next}`);
+  };
+
+  const handleSetLanguageMode = (langId: string) => {
+    if (!active) return;
+    setFiles(prev => prev.map(f => (f.id === active.id ? { ...f, language: langId, modified: true } : f)));
+    if (editorRef.current && monacoRef.current) {
+      const model = editorRef.current.getModel();
+      if (model) {
+        monacoRef.current.editor.setModelLanguage(model, langId);
+      }
+    }
+    setShowLanguagePicker(false);
+    setTerminal(prev => `${prev}\n✓ Language mode changed to: ${langId}`);
+  };
+
+  const handleGoToLineSubmit = () => {
+    const line = parseInt(goToLineInput, 10);
+    if (!isNaN(line) && line > 0 && editorRef.current) {
+      editorRef.current.revealLineInCenter(line);
+      editorRef.current.setPosition({ lineNumber: line, column: 1 });
+      editorRef.current.focus();
+    }
+    setShowGoToLine(false);
+    setGoToLineInput('');
+  };
+
+  const handleFormatDocument = () => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+      const action = editorRef.current.getAction('editor.action.formatDocument');
+      if (action) {
+        action.run();
+        setTerminal(prev => `${prev}\n✓ Document formatted`);
+      }
+    }
+    setShowIndentPicker(false);
   };
 
   // Voice to Code Dictation
@@ -2429,9 +2547,15 @@ if 'matplotlib.pyplot' in sys.modules:
       } else if (mod && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         setShowFindReplace(true);
+      } else if (mod && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        setShowGoToLine(true);
       } else if (e.key === 'Escape') {
         setPalette(false);
         setShowFindReplace(false);
+        setShowLanguagePicker(false);
+        setShowIndentPicker(false);
+        setShowGoToLine(false);
       }
     };
     window.addEventListener('keydown', handler);
@@ -3404,7 +3528,8 @@ if 'matplotlib.pyplot' in sys.modules:
                       fontSize,
                       automaticLayout: true,
                       wordWrap: wordWrap ? 'on' : 'off',
-                      tabSize: 2,
+                      tabSize: indentSettings.tabSize,
+                      insertSpaces: indentSettings.insertSpaces,
                       suggestOnTriggerCharacters: true,
                       quickSuggestions: true,
                       parameterHints: { enabled: true },
@@ -3434,9 +3559,10 @@ if 'matplotlib.pyplot' in sys.modules:
                       glyphMargin: true,
                       lineNumbersMinChars: 3
                     }}
-                    onValidate={(markers: any[]) =>
-                      setDiagnostics(markers.length ? `${markers.length} diagnostic${markers.length > 1 ? 's' : ''} detected.` : 'No problems detected.')
-                    }
+                    onValidate={(markers: any[]) => {
+                      setEditorMarkers(markers || []);
+                      setDiagnostics(markers && markers.length ? `${markers.length} diagnostic${markers.length > 1 ? 's' : ''} detected.` : 'No problems detected.');
+                    }}
                   />
                 </div>
 
@@ -4081,6 +4207,17 @@ if 'matplotlib.pyplot' in sys.modules:
               <div className="panel-tabs">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <button
+                    className={panelTab === 'problems' ? 'panel-active' : ''}
+                    onClick={() => setPanelTab('problems')}
+                  >
+                    PROBLEMS{' '}
+                    <span className="problems-tab-badge">
+                      {errorCount > 0 && <span className="tab-error-count"><AlertCircle size={10} />{errorCount}</span>}
+                      {warningCount > 0 && <span className="tab-warn-count"><AlertTriangle size={10} />{warningCount}</span>}
+                      {errorCount === 0 && warningCount === 0 && <em>0</em>}
+                    </span>
+                  </button>
+                  <button
                     className={panelTab === 'terminal' ? 'panel-active' : ''}
                     onClick={() => setPanelTab('terminal')}
                   >
@@ -4124,7 +4261,38 @@ if 'matplotlib.pyplot' in sys.modules:
                 </button>
               </div>
 
-              {panelTab === 'plot' && plotImage ? (
+              {panelTab === 'problems' ? (
+                <div className="problems-list">
+                  {editorMarkers.length === 0 ? (
+                    <div className="problems-empty">
+                      <CheckCircle2 size={16} className="text-emerald-400" />
+                      <span>No problems have been detected in {active?.name || 'the active file'}.</span>
+                    </div>
+                  ) : (
+                    editorMarkers.map((m, idx) => (
+                      <div
+                        key={idx}
+                        className="problem-item"
+                        onClick={() => {
+                          if (editorRef.current) {
+                            editorRef.current.revealPositionInCenter({ lineNumber: m.startLineNumber, column: m.startColumn });
+                            editorRef.current.setPosition({ lineNumber: m.startLineNumber, column: m.startColumn });
+                            editorRef.current.focus();
+                          }
+                        }}
+                      >
+                        {m.severity === 8 ? (
+                          <AlertCircle size={13} className="text-red-400 flex-shrink-0" />
+                        ) : (
+                          <AlertTriangle size={13} className="text-amber-400 flex-shrink-0" />
+                        )}
+                        <span className="problem-msg">{m.message}</span>
+                        <span className="problem-loc">[{m.startLineNumber}, {m.startColumn}]</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : panelTab === 'plot' && plotImage ? (
                 <div className="plot-output-view">
                   <img src={plotImage} alt="Python Matplotlib Graphic Output" className="plot-image-render" />
                   <a
@@ -4164,26 +4332,104 @@ if 'matplotlib.pyplot' in sys.modules:
       {/* Footer Status Bar */}
       <footer className="statusbar">
         <div className="status-left">
-          <span>
-            <Check size={12} /> {active?.modified ? 'Unsaved' : 'Saved'}
+          {/* Git Branch Pill */}
+          <button
+            className="status-btn"
+            title="Git Branch - Click to view Source Control"
+            onClick={() => {
+              setView('editor');
+              setSidebarTab('git');
+              setSidebar(true);
+            }}
+          >
+            <GitBranch size={11} />
+            <span>{branch}</span>
+            <RotateCw size={10} className="status-sync-icon" />
+          </button>
+
+          {/* Diagnostics Error / Warning Counter */}
+          <button
+            className={`status-btn diagnostics-btn ${errorCount > 0 ? 'has-errors' : ''}`}
+            title={`${errorCount} error(s), ${warningCount} warning(s) - Click to view problems`}
+            onClick={() => {
+              setPanelTab('problems');
+              setPanel(true);
+            }}
+          >
+            <span className="diag-pill error-pill">
+              <AlertCircle size={11} /> {errorCount}
+            </span>
+            <span className="diag-pill warn-pill">
+              <AlertTriangle size={11} /> {warningCount}
+            </span>
+          </button>
+
+          {/* File Saved / Modified Indicator */}
+          <span className="status-text saved-indicator" title={active?.modified ? 'File has unsaved changes' : 'All changes saved'}>
+            <Check size={11} className={active?.modified ? 'text-amber-400' : 'text-emerald-400'} />
+            <span className="hide-on-tiny-screen">{active?.modified ? 'Unsaved' : 'Saved'}</span>
           </span>
-          <span>
-            <GitBranch size={12} /> {branch}
-          </span>
-          <span>{active?.language}</span>
         </div>
+
         <div className="status-right">
-          <button className="status-btn" title="Starter Templates" onClick={() => setView('templates')}>
-            <Layers size={12} /> Templates
+          {/* Line & Column Coordinates (Go to Line) */}
+          <button
+            className="status-btn"
+            title="Go to Line (Ctrl+G)"
+            onClick={() => setShowGoToLine(true)}
+          >
+            Ln {currentCursor.line}, Col {currentCursor.column}
           </button>
-          <button className="status-btn" onClick={() => setView('ai')}>
-            <Sparkles size={12} /> AI
+
+          {/* Indentation Picker */}
+          <button
+            className="status-btn"
+            title="Indentation Settings - Click to change"
+            onClick={() => setShowIndentPicker(true)}
+          >
+            {indentSettings.insertSpaces ? `Spaces: ${indentSettings.tabSize}` : `Tab Size: ${indentSettings.tabSize}`}
           </button>
-          <button className="status-btn" onClick={() => setView('settings')}>
-            <Palette size={12} /> {theme}
+
+          {/* Encoding */}
+          <span className="status-text hide-on-mobile" title="File Encoding">
+            UTF-8
+          </span>
+
+          {/* Line Sequence Endings */}
+          <button
+            className="status-btn hide-on-tiny-screen"
+            title={`Line Endings: ${lineEnding} - Click to toggle LF / CRLF`}
+            onClick={toggleLineEnding}
+          >
+            {lineEnding}
           </button>
-          <button className="status-btn" onClick={() => setPanel(v => !v)}>
-            <Terminal size={12} />
+
+          {/* Language Mode Selector */}
+          <button
+            className="status-btn lang-btn"
+            title="Select Language Mode - Click to change"
+            onClick={() => setShowLanguagePicker(true)}
+          >
+            {AVAILABLE_LANGUAGES.find(l => l.id === active?.language)?.name || active?.language || 'Plain Text'}
+          </button>
+
+          {/* Terminal & Problems Toggle */}
+          <button
+            className={`status-btn ${panel ? 'active-panel-btn' : ''}`}
+            title="Toggle Bottom Terminal & Problems Panel"
+            onClick={() => setPanel(v => !v)}
+          >
+            <Terminal size={11} />
+          </button>
+
+          {/* AI Copilot Quick Button */}
+          <button
+            className="status-btn ai-status-btn"
+            title="Open CodeForge AI Assistant"
+            onClick={() => setView('ai')}
+          >
+            <Sparkles size={11} />
+            <span className="hide-on-mobile">AI</span>
           </button>
         </div>
       </footer>
@@ -4219,6 +4465,157 @@ if 'matplotlib.pyplot' in sys.modules:
               <button className="primary-wide" onClick={() => doFindReplace(false)}>Find Next</button>
               <button className="primary-wide secondary-theme-btn" onClick={() => doFindReplace(true)}>Replace All</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Select Language Mode Modal */}
+      {showLanguagePicker && (
+        <div className="palette-backdrop" onMouseDown={() => setShowLanguagePicker(false)}>
+          <div className="palette modal-panel" onMouseDown={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="view-head" style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Code2 size={18} color="#3b82f6" />
+                <b>Select Language Mode</b>
+              </div>
+              <button className="pill-btn" onClick={() => setShowLanguagePicker(false)}><X size={14} /></button>
+            </div>
+
+            <div className="setting-input-block" style={{ marginBottom: 12 }}>
+              <input
+                autoFocus
+                value={langSearchQuery}
+                onChange={e => setLangSearchQuery(e.target.value)}
+                placeholder="Search languages (e.g. python, typescript, html)..."
+              />
+            </div>
+
+            <div className="language-list-scroll">
+              {AVAILABLE_LANGUAGES.filter(l =>
+                l.name.toLowerCase().includes(langSearchQuery.toLowerCase()) ||
+                l.id.toLowerCase().includes(langSearchQuery.toLowerCase())
+              ).map(lang => (
+                <button
+                  key={lang.id}
+                  className={`language-select-item ${active?.language === lang.id ? 'active-lang' : ''}`}
+                  onClick={() => handleSetLanguageMode(lang.id)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="lang-item-name">{lang.name}</span>
+                    <span className="lang-item-ext">{lang.ext}</span>
+                  </div>
+                  {active?.language === lang.id && <Check size={14} className="text-blue-400" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Indentation Settings Modal */}
+      {showIndentPicker && (
+        <div className="palette-backdrop" onMouseDown={() => setShowIndentPicker(false)}>
+          <div className="palette modal-panel" onMouseDown={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="view-head" style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Indent size={18} color="#8b5cf6" />
+                <b>Indentation & Formatting</b>
+              </div>
+              <button className="pill-btn" onClick={() => setShowIndentPicker(false)}><X size={14} /></button>
+            </div>
+
+            <div className="indent-options-list">
+              <button
+                className={`language-select-item ${indentSettings.insertSpaces && indentSettings.tabSize === 2 ? 'active-lang' : ''}`}
+                onClick={() => applyIndentation(2, true)}
+              >
+                <div>
+                  <div className="lang-item-name">Indent Using Spaces (2)</div>
+                  <small style={{ color: 'var(--text-muted)' }}>Standard for HTML, JavaScript, TypeScript, React</small>
+                </div>
+                {indentSettings.insertSpaces && indentSettings.tabSize === 2 && <Check size={14} className="text-blue-400" />}
+              </button>
+
+              <button
+                className={`language-select-item ${indentSettings.insertSpaces && indentSettings.tabSize === 4 ? 'active-lang' : ''}`}
+                onClick={() => applyIndentation(4, true)}
+              >
+                <div>
+                  <div className="lang-item-name">Indent Using Spaces (4)</div>
+                  <small style={{ color: 'var(--text-muted)' }}>Standard for Python, C++, Java, Rust</small>
+                </div>
+                {indentSettings.insertSpaces && indentSettings.tabSize === 4 && <Check size={14} className="text-blue-400" />}
+              </button>
+
+              <button
+                className={`language-select-item ${!indentSettings.insertSpaces && indentSettings.tabSize === 2 ? 'active-lang' : ''}`}
+                onClick={() => applyIndentation(2, false)}
+              >
+                <div>
+                  <div className="lang-item-name">Indent Using Tabs (Tab Size: 2)</div>
+                  <small style={{ color: 'var(--text-muted)' }}>Hard tab indentation</small>
+                </div>
+                {!indentSettings.insertSpaces && indentSettings.tabSize === 2 && <Check size={14} className="text-blue-400" />}
+              </button>
+
+              <button
+                className={`language-select-item ${!indentSettings.insertSpaces && indentSettings.tabSize === 4 ? 'active-lang' : ''}`}
+                onClick={() => applyIndentation(4, false)}
+              >
+                <div>
+                  <div className="lang-item-name">Indent Using Tabs (Tab Size: 4)</div>
+                  <small style={{ color: 'var(--text-muted)' }}>Hard tab indentation</small>
+                </div>
+                {!indentSettings.insertSpaces && indentSettings.tabSize === 4 && <Check size={14} className="text-blue-400" />}
+              </button>
+
+              <div className="symbol-divider" style={{ width: '100%', height: 1, margin: '8px 0' }} />
+
+              <button
+                className="language-select-item format-action-btn"
+                onClick={handleFormatDocument}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Sparkles size={15} className="text-indigo-400" />
+                  <span className="lang-item-name">Format Document</span>
+                </div>
+                <small style={{ color: 'var(--text-muted)' }}>Alt+Shift+F</small>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Go to Line Modal */}
+      {showGoToLine && (
+        <div className="palette-backdrop" onMouseDown={() => setShowGoToLine(false)}>
+          <div className="palette modal-panel" onMouseDown={e => e.stopPropagation()} style={{ maxWidth: 360 }}>
+            <div className="view-head" style={{ marginBottom: 12 }}>
+              <b>Go to Line</b>
+              <button className="pill-btn" onClick={() => setShowGoToLine(false)}><X size={14} /></button>
+            </div>
+
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                handleGoToLineSubmit();
+              }}
+            >
+              <div className="setting-input-block" style={{ marginBottom: 12 }}>
+                <label>Line Number</label>
+                <input
+                  autoFocus
+                  type="number"
+                  min="1"
+                  value={goToLineInput}
+                  onChange={e => setGoToLineInput(e.target.value)}
+                  placeholder="e.g. 25"
+                />
+              </div>
+              <button type="submit" className="primary-wide">
+                Jump to Line
+              </button>
+            </form>
           </div>
         </div>
       )}

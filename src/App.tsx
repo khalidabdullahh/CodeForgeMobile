@@ -765,6 +765,9 @@ function App() {
   const [previewKey, setPreviewKey] = useState(0);
   const [splitPreview, setSplitPreview] = useState(false);
   const [palette, setPalette] = useState(false);
+  const [paletteSearchQuery, setPaletteSearchQuery] = useState('');
+  const [paletteCategoryFilter, setPaletteCategoryFilter] = useState<'all' | 'file' | 'edit' | 'view' | 'preferences' | 'run' | 'git'>('all');
+  const [paletteActiveIndex, setPaletteActiveIndex] = useState(0);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem('codeforge-font') || 13));
   const [wordWrap, setWordWrap] = useState(true);
@@ -2427,6 +2430,376 @@ if 'matplotlib.pyplot' in sys.modules:
     }
   };
 
+  // VS Code Command Palette Registry
+  const commandsList = useMemo(() => {
+    return [
+      // File Category
+      {
+        id: 'file.new',
+        category: 'File' as const,
+        title: 'File: New File...',
+        shortcut: '⌘N',
+        icon: FilePlus2,
+        action: () => openCreateFileDialog()
+      },
+      {
+        id: 'file.save',
+        category: 'File' as const,
+        title: 'File: Save Current File',
+        shortcut: '⌘S',
+        icon: Save,
+        action: () => {
+          setFiles(prev => prev.map(f => (f.id === active.id ? { ...f, modified: false } : f)));
+          setTerminal(prev => `${prev}\n✓ Saved ${active.name}`);
+        }
+      },
+      {
+        id: 'file.import',
+        category: 'File' as const,
+        title: 'File: Import Project / Files...',
+        shortcut: '⌘O',
+        icon: Upload,
+        action: () => setShowImportModal(true)
+      },
+      {
+        id: 'file.exportZip',
+        category: 'File' as const,
+        title: 'File: Export Workspace as ZIP',
+        icon: Download,
+        action: () => exportProjectZip()
+      },
+      {
+        id: 'file.exportAndroid',
+        category: 'File' as const,
+        title: 'File: Export Android Package (APK Config)',
+        icon: Smartphone,
+        action: () => exportAndroidPackage()
+      },
+      {
+        id: 'file.close',
+        category: 'File' as const,
+        title: 'File: Close Active Tab',
+        shortcut: '⌘W',
+        icon: X,
+        action: () => closeTab(active.id)
+      },
+      {
+        id: 'file.delete',
+        category: 'File' as const,
+        title: 'File: Delete Active File',
+        icon: Trash2,
+        action: () => deleteFile(active.id)
+      },
+
+      // Edit Category
+      {
+        id: 'edit.format',
+        category: 'Edit' as const,
+        title: 'Format: Format Document',
+        shortcut: '⌥⇧F',
+        icon: Wand2,
+        action: () => handleFormatDocument()
+      },
+      {
+        id: 'edit.find',
+        category: 'Edit' as const,
+        title: 'Edit: Find & Replace',
+        shortcut: '⌘F',
+        icon: Search,
+        action: () => setShowFindReplace(true)
+      },
+      {
+        id: 'edit.gotoLine',
+        category: 'Edit' as const,
+        title: 'Edit: Go to Line...',
+        shortcut: '⌃G',
+        icon: ArrowRightToLine,
+        action: () => setShowGoToLine(true)
+      },
+      {
+        id: 'edit.comment',
+        category: 'Edit' as const,
+        title: 'Edit: Toggle Line Comment',
+        shortcut: '⌘/',
+        icon: Slash,
+        action: () => handleCommentToggle()
+      },
+      {
+        id: 'edit.duplicate',
+        category: 'Edit' as const,
+        title: 'Edit: Duplicate Line Down',
+        shortcut: '⌥⇧↓',
+        icon: CopyPlus,
+        action: () => handleDuplicateLine()
+      },
+      {
+        id: 'edit.selectWord',
+        category: 'Edit' as const,
+        title: 'Edit: Expand Selection / Smart Select',
+        icon: Check,
+        action: () => handleSelectExpand()
+      },
+      {
+        id: 'edit.undo',
+        category: 'Edit' as const,
+        title: 'Edit: Undo',
+        shortcut: '⌘Z',
+        icon: Undo2,
+        action: () => handleUndo()
+      },
+      {
+        id: 'edit.redo',
+        category: 'Edit' as const,
+        title: 'Edit: Redo',
+        shortcut: '⌘Y',
+        icon: RotateCw,
+        action: () => handleRedo()
+      },
+
+      // View Category
+      {
+        id: 'view.wordWrap',
+        category: 'View' as const,
+        title: `View: Toggle Word Wrap (${wordWrap ? 'On' : 'Off'})`,
+        shortcut: '⌥Z',
+        icon: Code2,
+        action: () => setWordWrap(w => !w)
+      },
+      {
+        id: 'view.stickyScroll',
+        category: 'View' as const,
+        title: `View: Toggle Sticky Scroll (${stickyScroll ? 'Enabled' : 'Disabled'})`,
+        icon: Pin,
+        action: () => setStickyScroll(s => !s)
+      },
+      {
+        id: 'view.togglePanel',
+        category: 'View' as const,
+        title: `View: Toggle Terminal & Output Panel (${panel ? 'Open' : 'Closed'})`,
+        shortcut: '⌃`',
+        icon: Terminal,
+        action: () => setPanel(p => !p)
+      },
+      {
+        id: 'view.problems',
+        category: 'View' as const,
+        title: `View: Show Problems (${errorCount} errors, ${warningCount} warnings)`,
+        icon: AlertCircle,
+        action: () => {
+          setPanelTab('problems');
+          setPanel(true);
+        }
+      },
+      {
+        id: 'view.explorer',
+        category: 'View' as const,
+        title: 'View: Show File Explorer',
+        shortcut: '⇧⌘E',
+        icon: Files,
+        action: () => {
+          setView('editor');
+          setSidebarTab('explorer');
+          setSidebar(true);
+        }
+      },
+      {
+        id: 'view.search',
+        category: 'View' as const,
+        title: 'View: Show Search in Workspace',
+        shortcut: '⇧⌘F',
+        icon: Search,
+        action: () => {
+          setView('editor');
+          setSidebarTab('search');
+          setSidebar(true);
+        }
+      },
+      {
+        id: 'view.git',
+        category: 'View' as const,
+        title: 'View: Show Source Control (Git)',
+        shortcut: '⌃⇧G',
+        icon: GitBranch,
+        action: () => {
+          setView('editor');
+          setSidebarTab('git');
+          setSidebar(true);
+        }
+      },
+      {
+        id: 'view.ai',
+        category: 'View' as const,
+        title: 'View: Show CodeForge AI Copilot',
+        icon: Sparkles,
+        action: () => setView('ai')
+      },
+      {
+        id: 'view.extensions',
+        category: 'View' as const,
+        title: 'View: Show Extensions Marketplace',
+        shortcut: '⇧⌘X',
+        icon: Package,
+        action: () => setView('extensions')
+      },
+      {
+        id: 'view.templates',
+        category: 'View' as const,
+        title: 'View: Starter Project Templates',
+        icon: Layers,
+        action: () => setView('templates')
+      },
+      {
+        id: 'view.preview',
+        category: 'View' as const,
+        title: 'View: Open Fullscreen Runtime Preview',
+        icon: Play,
+        action: () => {
+          setView('preview');
+          setPreviewKey(k => k + 1);
+        }
+      },
+      {
+        id: 'view.splitPreview',
+        category: 'View' as const,
+        title: `View: Toggle Split Live Preview (${splitPreview ? 'Open' : 'Closed'})`,
+        icon: Columns,
+        action: () => setSplitPreview(s => !s)
+      },
+
+      // Preferences Category
+      {
+        id: 'pref.theme',
+        category: 'Preferences' as const,
+        title: `Preferences: Color Theme (Current: ${theme})`,
+        icon: Sparkles,
+        action: () => setView('settings')
+      },
+      {
+        id: 'pref.language',
+        category: 'Preferences' as const,
+        title: `Preferences: Select Language Mode (${active?.language || 'plaintext'})`,
+        icon: Code2,
+        action: () => setShowLanguagePicker(true)
+      },
+      {
+        id: 'pref.indent',
+        category: 'Preferences' as const,
+        title: `Preferences: Indentation (${indentSettings.insertSpaces ? `Spaces: ${indentSettings.tabSize}` : `Tab: ${indentSettings.tabSize}`})`,
+        icon: Indent,
+        action: () => setShowIndentPicker(true)
+      },
+      {
+        id: 'pref.lineEnding',
+        category: 'Preferences' as const,
+        title: `Preferences: Toggle Line Endings (Current: ${lineEnding})`,
+        icon: Check,
+        action: () => toggleLineEnding()
+      },
+      {
+        id: 'pref.settings',
+        category: 'Preferences' as const,
+        title: 'Preferences: Open Settings',
+        shortcut: '⌘,',
+        icon: Settings,
+        action: () => setView('settings')
+      },
+
+      // Run Category
+      {
+        id: 'run.code',
+        category: 'Run' as const,
+        title: `Run: Run Current File (${active?.name})`,
+        shortcut: 'F5',
+        icon: Play,
+        action: () => handleRunCurrentCode()
+      },
+      {
+        id: 'run.python',
+        category: 'Run' as const,
+        title: 'Run: Execute Python in Pyodide Runtime',
+        icon: Play,
+        action: () => {
+          if (active.language === 'python' || active.name.endsWith('.py')) runPythonCode(active.content);
+          else runPythonCode(files.find(f => f.name.endsWith('.py'))?.content || 'print("Hello from Python!")');
+        }
+      },
+      {
+        id: 'run.clear',
+        category: 'Run' as const,
+        title: 'Terminal: Clear Terminal Output',
+        icon: Trash2,
+        action: () => setTerminal('$ clear\n')
+      },
+
+      // Git Category
+      {
+        id: 'git.cloud',
+        category: 'Git' as const,
+        title: 'Git: GitHub Cloud Push & Pull',
+        icon: Cloud,
+        action: () => setView('github-sync')
+      },
+      {
+        id: 'git.liveshare',
+        category: 'Git' as const,
+        title: 'Live Share: Realtime Peer Collaboration Room',
+        icon: Users,
+        action: () => setView('liveshare')
+      },
+      {
+        id: 'nav.landing',
+        category: 'View' as const,
+        title: 'CodeForge: Return to Landing Page',
+        icon: Home,
+        action: () => setInIdeMode(false)
+      }
+    ];
+  }, [active, files, wordWrap, stickyScroll, panel, errorCount, warningCount, splitPreview, theme, indentSettings, lineEnding]);
+
+  const filteredPaletteCommands = useMemo(() => {
+    let list = commandsList;
+    if (paletteCategoryFilter !== 'all') {
+      list = list.filter(c => c.category.toLowerCase() === paletteCategoryFilter);
+    }
+    const q = paletteSearchQuery.trim().toLowerCase().replace(/^>\s*/, '');
+    if (!q) return list;
+    return list.filter(c =>
+      c.title.toLowerCase().includes(q) ||
+      c.category.toLowerCase().includes(q)
+    );
+  }, [commandsList, paletteCategoryFilter, paletteSearchQuery]);
+
+  useEffect(() => {
+    if (palette) {
+      setPaletteSearchQuery('');
+      setPaletteCategoryFilter('all');
+      setPaletteActiveIndex(0);
+    }
+  }, [palette]);
+
+  const executeCommandItem = (cmd: typeof commandsList[0]) => {
+    setPalette(false);
+    setPaletteSearchQuery('');
+    cmd.action();
+  };
+
+  const handlePaletteKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setPaletteActiveIndex(prev => (prev + 1) % (filteredPaletteCommands.length || 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setPaletteActiveIndex(prev => (prev - 1 + filteredPaletteCommands.length) % (filteredPaletteCommands.length || 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredPaletteCommands[paletteActiveIndex]) {
+        executeCommandItem(filteredPaletteCommands[paletteActiveIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setPalette(false);
+    }
+  };
+
   const executePalette = (action: string) => {
     setPalette(false);
     if (action === 'new') openCreateFileDialog();
@@ -2447,7 +2820,7 @@ if 'matplotlib.pyplot' in sys.modules:
     if (action === 'git') setView('git');
     if (action === 'ai') setView('ai');
     if (action === 'settings') setView('settings');
-    if (action === 'format') formatFile();
+    if (action === 'format') handleFormatDocument();
     if (action === 'zip') exportProjectZip();
     if (action === 'landing') setInIdeMode(false);
     if (action === 'save') {
@@ -4846,59 +5219,87 @@ if 'matplotlib.pyplot' in sys.modules:
       {/* Command Palette Modal */}
       {palette && (
         <div className="palette-backdrop" onMouseDown={() => setPalette(false)}>
-          <div className="palette" onMouseDown={e => e.stopPropagation()}>
-            <div className="palette-input">
-              <Search size={16} />
-              <input autoFocus placeholder="Type a command or action..." onChange={e => setSearch(e.target.value)} />
+          <div className="palette vs-command-palette" onMouseDown={e => e.stopPropagation()}>
+            <div className="palette-header">
+              <span className="palette-prefix">&gt;</span>
+              <input
+                autoFocus
+                value={paletteSearchQuery}
+                placeholder="Type a command or filter by category..."
+                onChange={e => {
+                  setPaletteSearchQuery(e.target.value);
+                  setPaletteActiveIndex(0);
+                }}
+                onKeyDown={handlePaletteKeyDown}
+              />
+              {paletteSearchQuery && (
+                <button
+                  type="button"
+                  className="palette-clear-btn"
+                  onClick={() => {
+                    setPaletteSearchQuery('');
+                    setPaletteActiveIndex(0);
+                  }}
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <button onClick={() => executePalette('new')}>
-              <FilePlus2 size={15} /> New File <kbd>⌘N</kbd>
-            </button>
-            <button onClick={() => executePalette('import')}>
-              <Upload size={15} /> Import Project / Files
-            </button>
-            <button onClick={() => executePalette('python')}>
-              <Play size={15} /> Run In-Browser Python (Pyodide)
-            </button>
-            <button onClick={() => executePalette('templates')}>
-              <Layers size={15} /> Starter Project Templates
-            </button>
-            <button onClick={() => executePalette('github-sync')}>
-              <Cloud size={15} /> GitHub Cloud Push & Pull
-            </button>
-            <button onClick={() => executePalette('liveshare')}>
-              <Users size={15} /> Realtime Live Share Room
-            </button>
-            <button onClick={() => executePalette('save')}>
-              <Save size={15} /> Save Current File <kbd>⌘S</kbd>
-            </button>
-            <button onClick={() => executePalette('format')}>
-              <Wand2 size={15} /> Format Code
-            </button>
-            <button onClick={() => executePalette('find')}>
-              <Search size={15} /> Find & Replace <kbd>⌘F</kbd>
-            </button>
-            <button onClick={() => executePalette('ai')}>
-              <Bot size={15} /> Open AI Copilot
-            </button>
-            <button onClick={() => executePalette('preview')}>
-              <Play size={15} /> Run Live Preview
-            </button>
-            <button onClick={() => executePalette('zip')}>
-              <Archive size={15} /> Export Project as ZIP
-            </button>
-            <button onClick={() => executePalette('landing')}>
-              <Home size={15} /> Return to Landing Page
-            </button>
-            <button onClick={() => executePalette('terminal')}>
-              <Terminal size={15} /> Toggle Terminal
-            </button>
-            <button onClick={() => executePalette('git')}>
-              <GitBranch size={15} /> Source Control
-            </button>
-            <button onClick={() => executePalette('settings')}>
-              <Settings size={15} /> Settings
-            </button>
+
+            {/* Mobile Category Filter Chips */}
+            <div className="palette-filter-bar">
+              {(['all', 'file', 'edit', 'view', 'preferences', 'run', 'git'] as const).map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`palette-cat-chip ${paletteCategoryFilter === cat ? 'active' : ''}`}
+                  onClick={() => {
+                    setPaletteCategoryFilter(cat);
+                    setPaletteActiveIndex(0);
+                  }}
+                >
+                  {cat === 'all' ? 'All Commands' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* Filtered Command List */}
+            <div className="palette-list" role="listbox">
+              {filteredPaletteCommands.length === 0 ? (
+                <div className="palette-empty">
+                  <AlertCircle size={20} />
+                  <span>No matching commands found</span>
+                </div>
+              ) : (
+                filteredPaletteCommands.map((cmd, idx) => {
+                  const Icon = cmd.icon;
+                  const isSelected = idx === paletteActiveIndex;
+                  return (
+                    <button
+                      key={cmd.id}
+                      type="button"
+                      className={`palette-item ${isSelected ? 'selected' : ''}`}
+                      onClick={() => executeCommandItem(cmd)}
+                      onMouseEnter={() => setPaletteActiveIndex(idx)}
+                      role="option"
+                      aria-selected={isSelected}
+                    >
+                      <div className="palette-item-left">
+                        <span className="palette-item-icon">
+                          <Icon size={15} />
+                        </span>
+                        <span className="palette-item-category">{cmd.category}:</span>
+                        <span className="palette-item-title">{cmd.title.replace(/^[^:]+:\s*/, '')}</span>
+                      </div>
+                      {cmd.shortcut && (
+                        <kbd className="palette-item-kbd">{cmd.shortcut}</kbd>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       )}

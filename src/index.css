@@ -2021,6 +2021,185 @@ button, input, textarea, select {
   background: var(--bg-tertiary, #1b2530);
 }
 
+/* VS Code Command Palette Enhancements */
+.vs-command-palette {
+  width: min(600px, calc(100vw - 20px));
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.palette-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color, #2a313b);
+  background: var(--bg-primary, #0d1117);
+}
+
+.palette-prefix {
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent-blue, #58a6ff);
+  user-select: none;
+}
+
+.palette-header input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-main, #e4eaf2);
+  font-size: 14px;
+}
+
+.palette-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #768294);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.palette-clear-btn:hover {
+  color: var(--text-main, #e4eaf2);
+  background: var(--bg-tertiary, #1b2530);
+}
+
+.palette-filter-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #11161d);
+  border-bottom: 1px solid var(--border-color, #222933);
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.palette-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.palette-cat-chip {
+  background: var(--bg-tertiary, #161f2c);
+  color: var(--text-muted, #8b949e);
+  border: 1px solid var(--border-color, #2c3644);
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.palette-cat-chip:hover {
+  color: var(--text-main, #e4eaf2);
+  border-color: var(--accent-blue, #58a6ff);
+}
+
+.palette-cat-chip.active {
+  background: rgba(56, 139, 253, 0.18);
+  color: #58a6ff;
+  border-color: #58a6ff;
+  font-weight: 600;
+}
+
+.palette-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 50vh;
+  padding: 4px 0;
+}
+
+.palette-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  min-height: 40px;
+  color: var(--text-main, #c1c9d5);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.1s ease;
+}
+
+.palette-item:hover,
+.palette-item.selected {
+  background: var(--bg-tertiary, #1c2738);
+  color: #fff;
+}
+
+.palette-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-item-icon {
+  display: flex;
+  align-items: center;
+  color: var(--accent-blue, #58a6ff);
+  flex-shrink: 0;
+}
+
+.palette-item-category {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #8b949e);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.palette-item.selected .palette-item-category {
+  color: #a5d6ff;
+}
+
+.palette-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.palette-item-kbd {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text-muted, #8b949e);
+  flex-shrink: 0;
+}
+
+.palette-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--text-muted, #8b949e);
+  font-size: 13px;
+}
+
 /* ========================================================= */
 /* TEMPLATES, PYTHON RUNNER & NEXT-GEN TOOLS                 */
 /* ========================================================= */

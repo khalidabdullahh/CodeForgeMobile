@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Cloud,
   Code2,
   Columns,
@@ -746,6 +747,10 @@ function App() {
   const [matchCase, setMatchCase] = useState(false);
   const [matchWholeWord, setMatchWholeWord] = useState(false);
   const [panel, setPanel] = useState(false);
+  const [isPanelMaximized, setIsPanelMaximized] = useState(false);
+  const [cmdHistory, setCmdHistory] = useState<string[]>(['help', 'ls']);
+  const [historyIdx, setHistoryIdx] = useState(-1);
+  const terminalOutputRef = useRef<HTMLPreElement>(null);
   const [search, setSearch] = useState('');
   const [contentSearch, setContentSearch] = useState('');
   const [terminal, setTerminal] = useState('CodeForge Terminal\n$ workspace ready\n$ Type help for commands.');
@@ -1982,9 +1987,45 @@ if 'matplotlib.pyplot' in sys.modules:
     }
   };
 
+  const handleHistoryUp = () => {
+    if (cmdHistory.length === 0) return;
+    const nextIdx = Math.min(historyIdx + 1, cmdHistory.length - 1);
+    setHistoryIdx(nextIdx);
+    setCommand(cmdHistory[nextIdx]);
+  };
+
+  const handleHistoryDown = () => {
+    if (historyIdx <= 0) {
+      setHistoryIdx(-1);
+      setCommand('');
+      return;
+    }
+    const nextIdx = historyIdx - 1;
+    setHistoryIdx(nextIdx);
+    setCommand(cmdHistory[nextIdx]);
+  };
+
+  const handleInsertTerminalSymbol = (sym: string) => {
+    setCommand(prev => prev + sym);
+  };
+
+  useEffect(() => {
+    if (panelTab === 'terminal' || panelTab === 'logs') {
+      try {
+        if (terminalOutputRef.current) {
+          terminalOutputRef.current.scrollTop = terminalOutputRef.current.scrollHeight;
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [terminal, panelTab]);
+
   const runCommand = (cmd: string) => {
     const clean = cmd.trim();
     if (!clean) return;
+    setCmdHistory(prev => [clean, ...prev.filter(x => x !== clean)]);
+    setHistoryIdx(-1);
     const lower = clean.toLowerCase();
     if (lower === 'help') setTerminal(prev => `${prev}\n$ ${clean}\nCommands: help, ls, tree, pwd, cat <file>, python <file>, npm run dev, npm test, clear`);
     else if (lower === 'ls') setTerminal(prev => `${prev}\n$ ls\n${files.map(f => f.name).join('  ')}`);
@@ -4767,9 +4808,9 @@ if 'matplotlib.pyplot' in sys.modules:
 
           {/* Bottom Terminal & Diagnostics Panel */}
           {panel && (
-            <section className="bottom-panel">
+            <section className={`bottom-panel ${isPanelMaximized ? 'maximized' : ''}`}>
               <div className="panel-tabs">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto' }}>
                   <button
                     className={panelTab === 'problems' ? 'panel-active' : ''}
                     onClick={() => setPanelTab('problems')}
@@ -4820,9 +4861,33 @@ if 'matplotlib.pyplot' in sys.modules:
                     </button>
                   )}
                 </div>
-                <button onClick={() => setPanel(false)}>
-                  <X size={16} />
-                </button>
+
+                <div className="panel-controls">
+                  <button
+                    className="panel-control-btn"
+                    title="Clear Output"
+                    onClick={() => {
+                      if (panelTab === 'terminal') runCommand('clear');
+                      else if (panelTab === 'logs') setConsoleLogs([]);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                  <button
+                    className="panel-control-btn"
+                    title={isPanelMaximized ? 'Restore Panel Size' : 'Maximize Panel'}
+                    onClick={() => setIsPanelMaximized(prev => !prev)}
+                  >
+                    {isPanelMaximized ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                  </button>
+                  <button
+                    className="panel-control-btn"
+                    title="Close Panel"
+                    onClick={() => setPanel(false)}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               </div>
 
               {panelTab === 'problems' ? (
@@ -4869,7 +4934,84 @@ if 'matplotlib.pyplot' in sys.modules:
                 </div>
               ) : (
                 <>
-                  <pre>{terminal}</pre>
+                  <pre ref={terminalOutputRef} className="terminal-output">{terminal}</pre>
+
+                  {/* Mobile Quick Terminal Toolbar */}
+                  <div className="terminal-quick-toolbar">
+                    <button
+                      type="button"
+                      className="term-tool-btn danger"
+                      title="Interrupt / Cancel"
+                      onClick={() => {
+                        setTerminal(prev => `${prev}\n^C`);
+                        setCommand('');
+                      }}
+                    >
+                      Ctrl+C
+                    </button>
+                    <button
+                      type="button"
+                      className="term-tool-btn"
+                      title="Clear terminal"
+                      onClick={() => runCommand('clear')}
+                    >
+                      clear
+                    </button>
+                    <button
+                      type="button"
+                      className="term-tool-btn"
+                      title="List files"
+                      onClick={() => runCommand('ls')}
+                    >
+                      ls
+                    </button>
+                    <button
+                      type="button"
+                      className="term-tool-btn highlight"
+                      title={`Run ${active?.name}`}
+                      onClick={() => {
+                        if (active?.name.endsWith('.py')) runCommand(`python ${active.name}`);
+                        else runCommand('npm run dev');
+                      }}
+                    >
+                      run {active?.name?.split('.').pop() || 'code'}
+                    </button>
+                    <button
+                      type="button"
+                      className="term-tool-btn"
+                      title="Git status"
+                      onClick={() => runCommand('git status')}
+                    >
+                      git status
+                    </button>
+                    <button
+                      type="button"
+                      className="term-tool-btn"
+                      title="History Prev"
+                      onClick={handleHistoryUp}
+                    >
+                      <ArrowUp size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      className="term-tool-btn"
+                      title="History Next"
+                      onClick={handleHistoryDown}
+                    >
+                      <ArrowDown size={12} />
+                    </button>
+                    {['|', '&', '~', '/', '$', '-', '--'].map(sym => (
+                      <button
+                        key={sym}
+                        type="button"
+                        className="term-tool-btn sym"
+                        onClick={() => handleInsertTerminalSymbol(` ${sym} `)}
+                      >
+                        {sym}
+                      </button>
+                    ))}
+                  </div>
+
                   <form
                     className="terminal-input"
                     onSubmit={e => {
@@ -4881,6 +5023,15 @@ if 'matplotlib.pyplot' in sys.modules:
                     <input
                       value={command}
                       onChange={e => setCommand(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          handleHistoryUp();
+                        } else if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          handleHistoryDown();
+                        }
+                      }}
                       placeholder="help, ls, python main.py, npm run dev..."
                       autoCapitalize="off"
                       autoCorrect="off"

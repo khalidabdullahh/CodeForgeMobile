@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import MonacoEditorRaw, { Editor as MonacoEditorNamed, OnMount } from '@monaco-editor/react';
+import MonacoEditorRaw, { Editor as MonacoEditorNamed, DiffEditor as MonacoDiffNamed, OnMount } from '@monaco-editor/react';
 import JSZip from 'jszip';
 
-// Resilient fallback for ESM/CJS interop so Editor is always a valid React component
+// Resilient fallback for ESM/CJS interop so Editor & DiffEditor are always valid React components
 const Editor: any = (MonacoEditorRaw as any)?.default || MonacoEditorNamed || MonacoEditorRaw;
+const DiffEditor: any = MonacoDiffNamed || (MonacoEditorRaw as any)?.DiffEditor;
 
 
 import {
@@ -36,6 +37,7 @@ import {
   FolderPlus,
   GitBranch,
   GitCommit,
+  GitCompare,
   Github,
   Home,
   Indent,
@@ -744,6 +746,13 @@ function App() {
   const [showTabMenu, setShowTabMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [showFileMenu, setShowFileMenu] = useState<FileItem | null>(null);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
+  const [diffTarget, setDiffTarget] = useState<FileItem | null>(null);
+  const [diffSideBySide, setDiffSideBySide] = useState(false);
+  const [savedSnapshots, setSavedSnapshots] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    defaultStarterFiles.forEach(f => { map[f.id] = f.content; });
+    return map;
+  });
   const tabItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [sidebar, setSidebar] = useState(() => window.innerWidth >= 768);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('explorer');
@@ -2072,12 +2081,33 @@ if 'matplotlib.pyplot' in sys.modules:
     setPanel(true);
   };
 
+  const discardFileChanges = (fileId: string) => {
+    const original = savedSnapshots[fileId];
+    if (original !== undefined) {
+      setFiles(prev => prev.map(f => (f.id === fileId ? { ...f, content: original, modified: false } : f)));
+      setTerminal(prev => `${prev}\n✓ Discarded uncommitted changes for file`);
+    } else {
+      setFiles(prev => prev.map(f => (f.id === fileId ? { ...f, modified: false } : f)));
+    }
+  };
+
+  const discardAllChanges = () => {
+    setFiles(prev => prev.map(f => ({ ...f, content: savedSnapshots[f.id] ?? f.content, modified: false })));
+    setTerminal(prev => `${prev}\n✓ Discarded all uncommitted changes in workspace`);
+  };
+
   const commit = () => {
     const message = gitMessage.trim();
     if (!message) return;
     setGitHistory(prev => [message, ...prev]);
+    setSavedSnapshots(prev => {
+      const next = { ...prev };
+      files.forEach(f => { next[f.id] = f.content; });
+      return next;
+    });
     setFiles(prev => prev.map(f => ({ ...f, modified: false })));
     setTerminal(prev => `${prev}\n✓ [${branch}] committed: ${message}`);
+    setGitMessage('');
   };
 
   const checkout = (next: string) => {
@@ -3636,30 +3666,88 @@ if 'matplotlib.pyplot' in sys.modules:
                     </button>
                   </div>
 
+                  {/* Mobile Quick Commit Prefixes */}
+                  <div className="git-quick-prefixes">
+                    {['feat', 'fix', 'chore', 'docs', 'refactor'].map(prefix => (
+                      <button
+                        key={prefix}
+                        type="button"
+                        className="git-prefix-chip"
+                        onClick={() => {
+                          setGitMessage(prev => {
+                            const trimmed = prev.replace(/^(feat|fix|chore|docs|refactor):\s*/i, '');
+                            return `${prefix}: ${trimmed}`;
+                          });
+                        }}
+                      >
+                        {prefix}:
+                      </button>
+                    ))}
+                  </div>
+
                   <textarea
                     className="sidebar-textarea"
                     rows={2}
                     value={gitMessage}
                     onChange={e => setGitMessage(e.target.value)}
-                    placeholder="Commit message..."
+                    placeholder="Commit message (e.g. feat: add screen)..."
                   />
 
                   <button className="sidebar-btn-primary" onClick={commit}>
                     <Check size={14} /> Commit to '{branch}'
                   </button>
 
-                  <div className="sidebar-section-title">
-                    CHANGES ({files.filter(f => f.modified).length})
+                  <div className="sidebar-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>CHANGES ({files.filter(f => f.modified).length})</span>
+                    {files.filter(f => f.modified).length > 0 && (
+                      <button
+                        type="button"
+                        className="git-discard-all-btn"
+                        title="Discard all changes"
+                        onClick={discardAllChanges}
+                      >
+                        <Undo2 size={11} /> Discard All
+                      </button>
+                    )}
                   </div>
 
                   {files.filter(f => f.modified).length > 0 ? (
                     files.filter(f => f.modified).map(f => (
-                      <div key={f.id} className="sidebar-item-row" onClick={() => openFile(f.id)}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <FileCode2 size={13} />
-                          {f.name}
-                        </span>
-                        <span className="sidebar-badge modified">M</span>
+                      <div key={f.id} className="sidebar-item-row git-change-row">
+                        <div
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, overflow: 'hidden', cursor: 'pointer' }}
+                          onClick={() => openFile(f.id)}
+                        >
+                          {renderFileIcon(f.name, 14)}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {f.name}
+                          </span>
+                        </div>
+                        <div className="git-change-actions">
+                          <button
+                            type="button"
+                            className="git-row-btn"
+                            title="Open Visual Diff"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDiffTarget(f);
+                            }}
+                          >
+                            <GitCompare size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="git-row-btn danger"
+                            title="Discard changes"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              discardFileChanges(f.id);
+                            }}
+                          >
+                            <Undo2 size={12} />
+                          </button>
+                          <span className="sidebar-badge modified">M</span>
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -5444,6 +5532,76 @@ if 'matplotlib.pyplot' in sys.modules:
                 <Trash2 size={14} />
                 <span>Delete File</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Visual Diff Viewer Modal (Original vs Working Tree) */}
+      {diffTarget && (
+        <div className="palette-backdrop" onMouseDown={() => setDiffTarget(null)}>
+          <div
+            className="palette modal-panel diff-viewer-panel"
+            onMouseDown={e => e.stopPropagation()}
+            style={{ width: 'min(920px, calc(100vw - 16px))', height: '80vh', display: 'flex', flexDirection: 'column' }}
+          >
+            <div className="view-head" style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color, #27313f)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                <GitCompare size={15} className="text-blue-400 flex-shrink-0" />
+                <b style={{ whiteSpace: 'nowrap' }}>Diff: {diffTarget.name}</b>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  (Saved ↔ Modified)
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  className="pill-btn"
+                  title="Toggle Inline / Side-by-side Diff"
+                  onClick={() => setDiffSideBySide(prev => !prev)}
+                >
+                  <Columns size={12} />
+                  <span>{diffSideBySide ? 'Inline Diff' : 'Side-by-Side'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="pill-btn text-red"
+                  title="Discard changes and revert to saved"
+                  onClick={() => {
+                    discardFileChanges(diffTarget.id);
+                    setDiffTarget(null);
+                  }}
+                >
+                  <Undo2 size={12} />
+                  <span>Revert</span>
+                </button>
+                <button
+                  type="button"
+                  className="pill-btn"
+                  onClick={() => setDiffTarget(null)}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+              <DiffEditor
+                height="100%"
+                theme={theme}
+                language={diffTarget.language}
+                original={savedSnapshots[diffTarget.id] || ''}
+                modified={diffTarget.content}
+                options={{
+                  renderSideBySide: diffSideBySide,
+                  readOnly: false,
+                  automaticLayout: true,
+                  fontSize: 12,
+                  lineNumbersMinChars: 3,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false
+                }}
+              />
             </div>
           </div>
         </div>

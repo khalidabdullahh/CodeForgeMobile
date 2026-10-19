@@ -45,8 +45,10 @@ import {
   Mic,
   MicOff,
   MoreHorizontal,
+  MoreVertical,
   Outdent,
   Package,
+  Pencil,
   Pin,
   Play,
   Plus,
@@ -740,6 +742,8 @@ function App() {
   const [pinnedTabs, setPinnedTabs] = useState<string[]>([]);
   const [showTabActionsModal, setShowTabActionsModal] = useState(false);
   const [showTabMenu, setShowTabMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [showFileMenu, setShowFileMenu] = useState<FileItem | null>(null);
+  const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
   const tabItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [sidebar, setSidebar] = useState(() => window.innerWidth >= 768);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('explorer');
@@ -3366,72 +3370,110 @@ if 'matplotlib.pyplot' in sys.modules:
                   <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filter files..." />
                 </div>
 
-                <div className="tree-root">
-                  <ChevronDown size={15} />
+                <div
+                  className="tree-root"
+                  onClick={() => setWorkspaceExpanded(prev => !prev)}
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                  {workspaceExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                   <FolderOpen size={16} />
                   <b>codeforge-workspace</b>
+                  <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)' }}>
+                    {files.length} file{files.length !== 1 ? 's' : ''}
+                  </span>
                 </div>
 
-                <div className="tree">
-                  {filtered.map(file => (
-                    <div key={file.id} className={`tree-file ${active?.id === file.id ? 'selected' : ''}`}>
-                      <button onClick={() => openFile(file.id)}>
-                        {renderFileIcon(file.name, 16)}
-                        <span>
-                          {renameId === file.id ? (
-                            <input
-                              autoFocus
-                              defaultValue={file.name}
-                              onBlur={e => renameFile(file.id, e.currentTarget.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') renameFile(file.id, e.currentTarget.value);
-                              }}
-                            />
-                          ) : (
-                            <>
-                              {file.path}
-                              {file.modified ? ' •' : ''}
-                            </>
-                          )}
-                        </span>
-                      </button>
-                      <div className="file-actions">
-                        <button
-                          title="Download File"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = file.name;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                            setTerminal(prev => `${prev}\n✓ Downloaded file: ${file.name}`);
-                          }}
-                        >
-                          <Download size={12} />
+                {workspaceExpanded && (
+                  <div className="tree">
+                    {filtered.map(file => (
+                      <div
+                        key={file.id}
+                        className={`tree-file ${active?.id === file.id ? 'selected' : ''}`}
+                        onContextMenu={e => {
+                          e.preventDefault();
+                          setShowFileMenu(file);
+                        }}
+                      >
+                        <button onClick={() => openFile(file.id)}>
+                          {renderFileIcon(file.name, 16)}
+                          <span>
+                            {renameId === file.id ? (
+                              <input
+                                autoFocus
+                                defaultValue={file.name}
+                                onBlur={e => renameFile(file.id, e.currentTarget.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') renameFile(file.id, e.currentTarget.value);
+                                }}
+                              />
+                            ) : (
+                              <>
+                                {file.path}
+                                {file.modified ? ' •' : ''}
+                              </>
+                            )}
+                          </span>
                         </button>
-                        <button title="Rename" onClick={() => setRenameId(file.id)}>
-                          R
-                        </button>
-                        <button
-                          title="Duplicate"
-                          onClick={() => {
-                            const copy = { ...file, id: crypto.randomUUID(), name: `${file.name}.copy`, path: `${file.path}.copy`, modified: true };
-                            setFiles(prev => [...prev, copy]);
-                            openFile(copy.id);
-                          }}
-                        >
-                          <Copy size={12} />
-                        </button>
-                        <button title="Delete" onClick={() => deleteFile(file.id)}>
-                          <Trash2 size={12} />
-                        </button>
+                        <div className="file-actions">
+                          <button
+                            title="Download File"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = file.name;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                              setTerminal(prev => `${prev}\n✓ Downloaded file: ${file.name}`);
+                            }}
+                          >
+                            <Download size={12} />
+                          </button>
+                          <button
+                            title="Rename"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRenameId(file.id);
+                            }}
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            title="Duplicate"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const copy = { ...file, id: crypto.randomUUID(), name: `${file.name}.copy`, path: `${file.path}.copy`, modified: true };
+                              setFiles(prev => [...prev, copy]);
+                              openFile(copy.id);
+                            }}
+                          >
+                            <Copy size={12} />
+                          </button>
+                          <button
+                            title="More options"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowFileMenu(file);
+                            }}
+                          >
+                            <MoreVertical size={12} />
+                          </button>
+                          <button
+                            title="Delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteFile(file.id);
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
 
                 <div className="side-tools">
                   <button onClick={() => { setView('templates'); if (window.innerWidth < 768) setSidebar(false); }}>
@@ -5278,6 +5320,129 @@ if 'matplotlib.pyplot' in sys.modules:
               >
                 <Copy size={14} />
                 <span>Copy File Path</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile File Context Sheet / Action Menu */}
+      {showFileMenu && (
+        <div
+          className="palette-backdrop"
+          onMouseDown={() => setShowFileMenu(null)}
+        >
+          <div
+            className="palette modal-panel file-options-modal"
+            onMouseDown={e => e.stopPropagation()}
+            style={{ maxWidth: 360 }}
+          >
+            <div className="view-head" style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {renderFileIcon(showFileMenu.name, 16)}
+                <b>{showFileMenu.name}</b>
+              </div>
+              <button className="pill-btn" onClick={() => setShowFileMenu(null)}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="tab-menu-list">
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  openFile(showFileMenu.id);
+                  setShowFileMenu(null);
+                }}
+              >
+                <FileCode2 size={14} />
+                <span>Open in Editor</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  openFile(showFileMenu.id);
+                  setSplitPreview(true);
+                  setShowFileMenu(null);
+                }}
+              >
+                <Columns size={14} />
+                <span>Open with Live Split Preview</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  setRenameId(showFileMenu.id);
+                  setShowFileMenu(null);
+                }}
+              >
+                <Pencil size={14} />
+                <span>Rename File</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  const copy = {
+                    ...showFileMenu,
+                    id: crypto.randomUUID(),
+                    name: `${showFileMenu.name}.copy`,
+                    path: `${showFileMenu.path}.copy`,
+                    modified: true
+                  };
+                  setFiles(prev => [...prev, copy]);
+                  openFile(copy.id);
+                  setShowFileMenu(null);
+                }}
+              >
+                <Copy size={14} />
+                <span>Duplicate File</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  const blob = new Blob([showFileMenu.content], { type: 'text/plain;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = showFileMenu.name;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  setTerminal(prev => `${prev}\n✓ Downloaded file: ${showFileMenu.name}`);
+                  setShowFileMenu(null);
+                }}
+              >
+                <Download size={14} />
+                <span>Download File</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  navigator.clipboard.writeText(showFileMenu.path);
+                  setTerminal(prev => `${prev}\n✓ Copied path: ${showFileMenu.path}`);
+                  setShowFileMenu(null);
+                }}
+              >
+                <Copy size={14} />
+                <span>Copy Path ({showFileMenu.path})</span>
+              </button>
+
+              <div className="tab-menu-divider" />
+
+              <button
+                className="tab-menu-item text-red"
+                onClick={() => {
+                  const targetId = showFileMenu.id;
+                  setShowFileMenu(null);
+                  deleteFile(targetId);
+                }}
+              >
+                <Trash2 size={14} />
+                <span>Delete File</span>
               </button>
             </div>
           </div>

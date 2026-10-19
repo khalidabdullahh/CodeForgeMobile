@@ -43,6 +43,7 @@ import {
   Menu,
   Mic,
   MicOff,
+  MoreHorizontal,
   Outdent,
   Package,
   Pin,
@@ -735,6 +736,10 @@ function App() {
   });
   const [activeId, setActiveId] = useState('index');
   const [openTabs, setOpenTabs] = useState<string[]>(['index']);
+  const [pinnedTabs, setPinnedTabs] = useState<string[]>([]);
+  const [showTabActionsModal, setShowTabActionsModal] = useState(false);
+  const [showTabMenu, setShowTabMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const tabItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [sidebar, setSidebar] = useState(() => window.innerWidth >= 768);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('explorer');
   const [replaceSearch, setReplaceSearch] = useState('');
@@ -1310,10 +1315,95 @@ function App() {
   };
 
   const closeTab = (id: string) => {
+    setPinnedTabs(prev => prev.filter(x => x !== id));
     const next = openTabs.filter(x => x !== id);
     setOpenTabs(next);
-    if (activeId === id) setActiveId(next[next.length - 1] || files[0]?.id || '');
+    if (activeId === id) setActiveId(next[next.length - 1] || '');
   };
+
+  const togglePinTab = (id: string) => {
+    setPinnedTabs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const closeOtherTabs = (id: string) => {
+    const next = openTabs.filter(x => x === id || pinnedTabs.includes(x));
+    setOpenTabs(next);
+    setActiveId(id);
+  };
+
+  const closeTabsToTheRight = (id: string) => {
+    const idx = openTabs.indexOf(id);
+    if (idx === -1) return;
+    const next = openTabs.filter((x, i) => i <= idx || pinnedTabs.includes(x));
+    setOpenTabs(next);
+    if (!next.includes(activeId)) setActiveId(id);
+  };
+
+  const closeSavedTabs = () => {
+    const modifiedIds = new Set(files.filter(f => f.modified).map(f => f.id));
+    const next = openTabs.filter(x => modifiedIds.has(x) || pinnedTabs.includes(x));
+    if (next.length === 0 && files[0]) {
+      setOpenTabs([files[0].id]);
+      setActiveId(files[0].id);
+    } else {
+      setOpenTabs(next);
+      if (!next.includes(activeId) && next[0]) setActiveId(next[0]);
+    }
+  };
+
+  const closeAllTabs = () => {
+    const next = openTabs.filter(x => pinnedTabs.includes(x));
+    setOpenTabs(next);
+    if (next.length === 0) {
+      setActiveId('');
+    } else if (!next.includes(activeId) && next[0]) {
+      setActiveId(next[0]);
+    }
+  };
+
+  const sortedTabs = useMemo(() => {
+    const pinned = openTabs.filter(id => pinnedTabs.includes(id));
+    const unpinned = openTabs.filter(id => !pinnedTabs.includes(id));
+    return [...pinned, ...unpinned];
+  }, [openTabs, pinnedTabs]);
+
+  const renderFileIcon = (fileName: string, size = 13) => {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'ts':
+      case 'tsx':
+        return <FileCode2 size={size} style={{ color: '#3178c6', flexShrink: 0 }} />;
+      case 'js':
+      case 'jsx':
+        return <FileCode2 size={size} style={{ color: '#eab308', flexShrink: 0 }} />;
+      case 'html':
+        return <Code2 size={size} style={{ color: '#ea580c', flexShrink: 0 }} />;
+      case 'css':
+        return <Sparkles size={size} style={{ color: '#06b6d4', flexShrink: 0 }} />;
+      case 'json':
+        return <Package size={size} style={{ color: '#eab308', flexShrink: 0 }} />;
+      case 'py':
+        return <Terminal size={size} style={{ color: '#10b981', flexShrink: 0 }} />;
+      case 'md':
+        return <FileText size={size} style={{ color: '#818cf8', flexShrink: 0 }} />;
+      default:
+        return <FileText size={size} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />;
+    }
+  };
+
+  useEffect(() => {
+    if (activeId && tabItemRefs.current[activeId]) {
+      try {
+        tabItemRefs.current[activeId]?.scrollIntoView({
+          behavior: 'smooth',
+          inline: 'nearest',
+          block: 'nearest'
+        });
+      } catch {
+        // fallback
+      }
+    }
+  }, [activeId]);
 
   const openCreateFileDialog = () => {
     setNewFileInputValue('');
@@ -2747,6 +2837,34 @@ if 'matplotlib.pyplot' in sys.modules:
         action: () => setView('liveshare')
       },
       {
+        id: 'view.pinTab',
+        category: 'View' as const,
+        title: `View: ${pinnedTabs.includes(active.id) ? 'Unpin Active Tab' : 'Pin Active Tab'}`,
+        icon: Pin,
+        action: () => togglePinTab(active.id)
+      },
+      {
+        id: 'view.closeOtherTabs',
+        category: 'View' as const,
+        title: 'View: Close Other Tabs in Workspace',
+        icon: Files,
+        action: () => closeOtherTabs(active.id)
+      },
+      {
+        id: 'view.closeSavedTabs',
+        category: 'View' as const,
+        title: 'View: Close Saved Tabs in Workspace',
+        icon: CheckCircle2,
+        action: closeSavedTabs
+      },
+      {
+        id: 'view.closeAllTabs',
+        category: 'View' as const,
+        title: 'View: Close All Tabs',
+        icon: Trash2,
+        action: closeAllTabs
+      },
+      {
         id: 'nav.landing',
         category: 'View' as const,
         title: 'CodeForge: Return to Landing Page',
@@ -2754,7 +2872,7 @@ if 'matplotlib.pyplot' in sys.modules:
         action: () => setInIdeMode(false)
       }
     ];
-  }, [active, files, wordWrap, stickyScroll, panel, errorCount, warningCount, splitPreview, theme, indentSettings, lineEnding]);
+  }, [active, files, wordWrap, stickyScroll, panel, errorCount, warningCount, splitPreview, theme, indentSettings, lineEnding, pinnedTabs]);
 
   const filteredPaletteCommands = useMemo(() => {
     let list = commandsList;
@@ -3217,7 +3335,7 @@ if 'matplotlib.pyplot' in sys.modules:
                   {filtered.map(file => (
                     <div key={file.id} className={`tree-file ${active?.id === file.id ? 'selected' : ''}`}>
                       <button onClick={() => openFile(file.id)}>
-                        <FileCode2 size={16} />
+                        {renderFileIcon(file.name, 16)}
                         <span>
                           {renameId === file.id ? (
                             <input
@@ -3759,34 +3877,106 @@ if 'matplotlib.pyplot' in sys.modules:
 
         {/* Center / Main Area */}
         <main className="main-area">
-          {/* Editor Tabs */}
-          <div className="tabs">
-            {openTabs.map(id => {
-              const file = files.find(f => f.id === id);
-              if (!file) return null;
-              return (
-                <button key={id} className={`tab ${id === activeId ? 'active' : ''}`} onClick={() => openFile(id)}>
-                  <FileText size={14} />
-                  {file.name}
-                  {file.modified ? ' •' : ''}
-                  <span
-                    onClick={e => {
-                      e.stopPropagation();
-                      closeTab(id);
+          {/* VS Code Editor Tabs Header */}
+          <div className="tabs-header-bar">
+            <div className="tabs-strip" role="tablist">
+              {sortedTabs.map(id => {
+                const file = files.find(f => f.id === id);
+                if (!file) return null;
+                const isPinned = pinnedTabs.includes(id);
+                const isActive = id === activeId;
+                return (
+                  <button
+                    key={id}
+                    ref={el => { tabItemRefs.current[id] = el; }}
+                    className={`tab ${isActive ? 'active' : ''} ${isPinned ? 'pinned' : ''}`}
+                    onClick={() => openFile(id)}
+                    onContextMenu={e => {
+                      e.preventDefault();
+                      setShowTabMenu({ id, x: e.clientX, y: e.clientY });
                     }}
+                    title={`${file.name} (${file.path})`}
+                    role="tab"
+                    aria-selected={isActive}
                   >
-                    <X size={14} />
-                  </span>
-                </button>
-              );
-            })}
-            <button className="new-tab" title="New file" onClick={openCreateFileDialog}>
-              <Plus size={17} />
-            </button>
+                    <span className="tab-icon">{renderFileIcon(file.name, 13)}</span>
+                    <span className="tab-label">{file.name}</span>
+                    {isPinned ? (
+                      <span
+                        className="tab-pin-indicator"
+                        title="Pinned tab (click to unpin)"
+                        onClick={e => {
+                          e.stopPropagation();
+                          togglePinTab(id);
+                        }}
+                      >
+                        <Pin size={11} className="tab-pin-icon" />
+                      </span>
+                    ) : (
+                      <span
+                        className={`tab-close-btn ${file.modified ? 'is-dirty' : ''}`}
+                        title={file.modified ? 'Unsaved changes (click to close)' : 'Close'}
+                        onClick={e => {
+                          e.stopPropagation();
+                          closeTab(id);
+                        }}
+                      >
+                        {file.modified ? <span className="dirty-dot">●</span> : <X size={13} />}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick Action Toolbar on Right of Tabs */}
+            <div className="tabs-actions-bar">
+              <button
+                className={`tab-action-btn ${splitPreview ? 'active' : ''}`}
+                title={splitPreview ? 'Close Split Preview' : 'Split Editor Preview'}
+                onClick={() => setSplitPreview(prev => !prev)}
+              >
+                <Columns size={14} />
+              </button>
+              <button
+                className="tab-action-btn"
+                title="New File"
+                onClick={openCreateFileDialog}
+              >
+                <Plus size={15} />
+              </button>
+              <button
+                className="tab-action-btn"
+                title="Tab Actions Menu"
+                onClick={() => setShowTabActionsModal(true)}
+              >
+                <MoreHorizontal size={15} />
+              </button>
+            </div>
           </div>
 
           {/* Code Editor View */}
           {view === 'editor' && (
+            openTabs.length === 0 ? (
+              <div className="empty-workspace-state">
+                <div className="empty-workspace-card">
+                  <Code2 size={48} className="empty-workspace-icon" />
+                  <h3>No Open Editors</h3>
+                  <p>Open a file from the explorer or create a new file to start coding.</p>
+                  <div className="empty-workspace-actions">
+                    <button className="primary-btn" onClick={openCreateFileDialog}>
+                      <Plus size={15} /> New File
+                    </button>
+                    <button className="btn" onClick={() => { setSidebar(true); setSidebarTab('explorer'); }}>
+                      <Files size={15} /> Open Explorer
+                    </button>
+                    <button className="btn" onClick={() => setPalette(true)}>
+                      <Search size={15} /> Command Palette
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div className="editor-wrap">
               <div className="editor-head">
                 <span>
@@ -4093,6 +4283,7 @@ if 'matplotlib.pyplot' in sys.modules:
                 ))}
               </div>
             </div>
+            )
           )}
 
           {/* Starter Project Templates View */}
@@ -4806,6 +4997,141 @@ if 'matplotlib.pyplot' in sys.modules:
           </button>
         </div>
       </footer>
+
+      {/* Mobile Tab Actions Sheet / Context Menu */}
+      {(showTabActionsModal || showTabMenu) && (
+        <div
+          className="palette-backdrop"
+          onMouseDown={() => {
+            setShowTabActionsModal(false);
+            setShowTabMenu(null);
+          }}
+        >
+          <div
+            className="palette modal-panel tab-options-modal"
+            onMouseDown={e => e.stopPropagation()}
+            style={{ maxWidth: 360 }}
+          >
+            <div className="view-head" style={{ marginBottom: 8 }}>
+              <b>Tab & Workspace Options</b>
+              <button
+                className="pill-btn"
+                onClick={() => {
+                  setShowTabActionsModal(false);
+                  setShowTabMenu(null);
+                }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="tab-menu-list">
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  const targetId = showTabMenu?.id || activeId;
+                  togglePinTab(targetId);
+                  setShowTabActionsModal(false);
+                  setShowTabMenu(null);
+                }}
+              >
+                <Pin size={14} />
+                <span>{pinnedTabs.includes(showTabMenu?.id || activeId) ? 'Unpin Active Tab' : 'Pin Active Tab'}</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  const targetId = showTabMenu?.id || activeId;
+                  closeTab(targetId);
+                  setShowTabActionsModal(false);
+                  setShowTabMenu(null);
+                }}
+              >
+                <X size={14} />
+                <span>Close Active Tab</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  const targetId = showTabMenu?.id || activeId;
+                  closeOtherTabs(targetId);
+                  setShowTabActionsModal(false);
+                  setShowTabMenu(null);
+                }}
+              >
+                <Files size={14} />
+                <span>Close Other Tabs</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  const targetId = showTabMenu?.id || activeId;
+                  closeTabsToTheRight(targetId);
+                  setShowTabActionsModal(false);
+                  setShowTabMenu(null);
+                }}
+              >
+                <ArrowRightToLine size={14} />
+                <span>Close Tabs to the Right</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  closeSavedTabs();
+                  setShowTabActionsModal(false);
+                  setShowTabMenu(null);
+                }}
+              >
+                <CheckCircle2 size={14} />
+                <span>Close Saved Tabs</span>
+              </button>
+
+              <button
+                className="tab-menu-item text-red"
+                onClick={() => {
+                  closeAllTabs();
+                  setShowTabActionsModal(false);
+                  setShowTabMenu(null);
+                }}
+              >
+                <Trash2 size={14} />
+                <span>Close All Tabs</span>
+              </button>
+
+              <div className="tab-menu-divider" />
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  setSplitPreview(prev => !prev);
+                  setShowTabActionsModal(false);
+                  setShowTabMenu(null);
+                }}
+              >
+                <Columns size={14} />
+                <span>{splitPreview ? 'Hide Split Preview' : 'Show Live Split Preview'}</span>
+              </button>
+
+              <button
+                className="tab-menu-item"
+                onClick={() => {
+                  navigator.clipboard.writeText(active?.path || active?.name || '');
+                  setTerminal(prev => `${prev}\n✓ Copied path: ${active?.path || active?.name}`);
+                  setShowTabActionsModal(false);
+                  setShowTabMenu(null);
+                }}
+              >
+                <Copy size={14} />
+                <span>Copy File Path</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Find & Replace Modal */}
       {showFindReplace && (

@@ -6,6 +6,7 @@ import {
   Code2,
   Columns,
   Download,
+  Film,
   FolderGit2,
   Github,
   Globe,
@@ -125,6 +126,17 @@ const MOCK_SNIPPETS = [
       { html: '&nbsp;&nbsp;<span class="c-tag">for</span> _ <span class="c-tag">in</span> range(n):' },
       { html: '&nbsp;&nbsp;&nbsp;&nbsp;print(a, end=<span class="c-str">" "</span>)' },
       { html: '&nbsp;&nbsp;&nbsp;&nbsp;a, b = b, a + b' }
+    ]
+  },
+  {
+    lang: 'StykAnime',
+    tab: 'fight.stk',
+    lines: [
+      { html: '<span class="c-tag">// StykAnime 2D Animation Engine</span>' },
+      { html: '<span class="c-attr">hero</span>.pose(<span class="c-str">"katana-slash"</span>);' },
+      { html: '<span class="c-attr">hero</span>.aura(<span class="c-str">"#38bdf8"</span>, <span class="c-str">"super-saiyan"</span>);' },
+      { html: '<span class="c-attr">rival</span>.pose(<span class="c-str">"guard-block"</span>);' },
+      { html: '<span class="c-attr">studio</span>.exportToWorkspace();' }
     ]
   }
 ];
@@ -670,6 +682,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <h4>100% Offline PWA</h4>
             <p>Installable directly from your browser as a standalone app that works seamlessly without WiFi.</p>
           </div>
+
+          <div className="feat-box anim-card" style={{ borderColor: 'rgba(56, 189, 248, 0.4)' }}>
+            <div className="feat-icon" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+              <Film size={22} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <h4 style={{ margin: 0 }}>StykAnime 2D Studio</h4>
+              <span style={{ fontSize: 10, background: '#2563eb', color: '#fff', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>NEW</span>
+            </div>
+            <p>
+              Pivot &amp; Stick Nodes-inspired 2D animator built right into your IDE. Drag joints with touch, create anime fights with Ki auras and katana slashes, and export directly as runnable HTML5 Canvas code!
+            </p>
+          </div>
         </div>
       </section>
 
@@ -767,7 +792,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <Code2 size={18} />
             <span>CodeForge Mobile</span>
           </div>
-          <p>© 2026 Khalid Abdullah. Released under the MIT License.</p>
+          <p>© 2026 Khalid Abdullah. All Rights Reserved. Source-Available.</p>
           <div className="footer-links">
             <a href="https://github.com/khalidabdullahh/CodeForgeMobile" target="_blank" rel="noreferrer">
               GitHub Repository
@@ -777,7 +802,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               target="_blank"
               rel="noreferrer"
             >
-              MIT License
+              License (Proprietary)
             </a>
             <a href="https://codeforgemobile.pages.dev" target="_blank" rel="noreferrer">
               Live Website

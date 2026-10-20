@@ -9,7 +9,7 @@
 [![Try Web IDE](https://img.shields.io/badge/🚀_LAUNCH_WEB_IDE-codeforgemobile.pages.dev-2563eb?style=for-the-badge&logo=googlechrome&logoColor=white)](https://codeforgemobile.pages.dev)
 [![Install App](https://img.shields.io/badge/📱_INSTALL_APP_(APK)-1--Click_Install-10b981?style=for-the-badge&logo=android&logoColor=white)](https://codeforgemobile.pages.dev)
 [![GitHub Stars](https://img.shields.io/github/stars/khalidabdullahh/CodeForgeMobile?style=for-the-badge&color=f59e0b&logo=github)](https://github.com/khalidabdullahh/CodeForgeMobile)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary%20%2F%20Source--Available-red?style=for-the-badge)](LICENSE)
 
 <br />
 
@@ -27,6 +27,7 @@
 | Action | Direct Link | Description |
 |---|---|---|
 | 🚀 **Try Web IDE** | **[Launch Web IDE](https://codeforgemobile.pages.dev)** | Open full VS Code editor directly in Chrome / Safari with 0 setup |
+| 🎬 **StykAnime Studio** | **[Open Studio](https://codeforgemobile.pages.dev)** | Pivot & Stick Nodes-style 2D stick animation studio with touch rigging & code export |
 | 📱 **Install App (APK/PWA)** | **[Install to Phone](https://codeforgemobile.pages.dev)** | 1-Click install to Android/iOS home screen for full offline use |
 | 📦 **Download Source ZIP** | **[Download Workspace](https://codeforgemobile.pages.dev)** | Export entire project and code files as `.zip` archive |
 | 🤖 **Android APK Packaging** | **[Capacitor Setup](https://codeforgemobile.pages.dev)** | Pre-configured Android Studio settings to build native APK/AAB |
@@ -37,7 +38,7 @@
 
 **CodeForge Mobile** is a full-featured, phone-first coding IDE designed to bring a true desktop **VS Code** experience to smartphones and tablets. 
 
-Powered by **Monaco Editor**, **AI Copilot (Gemini & OpenAI)**, **Offline Git**, and **Mobile Quick-Symbol Toolbars**, you can develop, debug, and preview web apps anywhere.
+Powered by **Monaco Editor**, **AI Copilot (Gemini & OpenAI)**, **Offline Git**, **StykAnime 2D Studio**, and **Mobile Quick-Symbol Toolbars**, you can develop, debug, and preview web apps anywhere.
 
 👉 **Official Live Website & App Hub:** **[https://codeforgemobile.pages.dev](https://codeforgemobile.pages.dev)**
 
@@ -46,6 +47,7 @@ Powered by **Monaco Editor**, **AI Copilot (Gemini & OpenAI)**, **Offline Git**,
 ## 🚀 Key Capabilities
 
 - ⚡ **Monaco Editor Engine:** The exact engine powering desktop VS Code with IntelliSense, auto-completion, bracket coloring, and syntax highlighting.
+- 🎬 **StykAnime 2D Animation Studio:** Built-in Pivot & Stick Nodes-inspired stickman & anime fight animator. Drag joint nodes with touch, create anime fight sequences with Super Saiyan ki auras and katana blades, edit keyframes with onion skinning, and export directly as standalone HTML5 Canvas code to run in your workspace!
 - ⌨️ **Mobile Quick Symbol Bar:** One-tap coding toolbar with `{ }`, `( )`, `[ ]`, `<`, `>`, `=>`, `;`, `===`, `" "`, `' '`, `\``, `Tab`, `Undo`, and `Redo`.
 - 🔄 **Landscape Mode Experience:** Turn your phone to landscape to unlock full desktop VS Code layout with side-by-side split screen and docked terminal.
 - 🤖 **AI Coding Copilot:** Integrated Gemini & OpenAI assistant to explain code, fix syntax errors, and generate components directly into your active files.
@@ -53,6 +55,27 @@ Powered by **Monaco Editor**, **AI Copilot (Gemini & OpenAI)**, **Offline Git**,
 - 🖥️ **Live Interactive Preview & In-App Console:** Real-time web preview that captures `console.log`, `console.warn`, and `console.error` directly into the in-app terminal.
 - 📴 **100% Offline PWA Ready:** Installable on Android, iOS, and Desktop as a standalone offline application.
 - 📦 **One-Click Export:** Download your entire project workspace as a standard `.zip` file with zero configuration.
+
+---
+
+## 🎬 StykAnime 2D Studio (Pivot & Stick Nodes Animation)
+
+CodeForge Mobile now includes **StykAnime Studio**, a touch-first 2D stick figure animator inspired by classic tools like **Pivot Animator** and **Stick Nodes**.
+
+### ✨ Highlights
+- 🦴 **Interactive Multi-Node Rigging:** 15 draggable joint nodes (Head, Neck, Shoulders, Elbows, Hands, Pelvis, Knees, Feet) with generous touch targets for mobile screens.
+- 🥋 **Dual Combat Rigging:** Hero + Rival stickmen for choreographing dynamic anime battle scenes.
+- ⚡ **Anime Visual Effects:** Super Saiyan Ki aura glow, Katana swords with angle tracking, energy blasts, and impact sparks.
+- 🎞️ **Keyframe Timeline:** Add, duplicate, and delete keyframes with real-time FPS control (6–24 FPS) and playback looping.
+- 👻 **Onion Skinning:** Displays a translucent ghost layer of previous frames for smooth motion choreography.
+- 🚀 **1-Click Export to CodeForge Workspace:** Injects complete, runnable `index.html` and `stykanime-animation.js` into your files so you can edit and run your animation in live preview!
+
+### 🕹️ How to Use in the IDE / Editor
+1. **Open the Studio:** Click the **Film (🎬)** icon on the left Activity Bar, or tap **More (...) ➔ StykAnime 2D studio**, or press `Ctrl+K` / `Cmd+K` and type `StykAnime`.
+2. **Pose Characters:** Touch or click any joint circle to pose limbs. Drag the golden center handle (waist/pelvis) to translate the entire figure.
+3. **Use Poses & Effects:** Tap quick anime pose presets (Idle, Punch, Kick, Slash, Ki Blast, Guard). Toggle **Super Aura** or **Katana Blade**.
+4. **Animate Frames:** Click **`+ Frame`** to create keyframes. Toggle **Onion Skinning** to align transitions. Press **`▶ Play`** to preview.
+5. **Export to Workspace:** Tap **`Export to Code`**. CodeForge will automatically generate the HTML5 Canvas project and launch the live runtime preview!
 
 ---
 
@@ -143,8 +166,12 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) fo
 
 ---
 
-## 📄 License
+## 📄 License & Proprietary Rights
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is source-available and governed by a **Custom Proprietary & Community Contribution License** - see the [LICENSE](LICENSE) file for complete details.
+
+- **Intellectual Property & Exclusive Ownership:** All software, design, and branding rights are exclusively reserved by **Khalid Abdullah**.
+- **Community Contributions:** Contributions via Pull Requests are welcomed under our contributor grant terms (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+- **Commercial Restrictions:** Commercial redistribution, reselling, sublicensing, or re-branding without prior written consent from Khalid Abdullah is strictly prohibited.
 
 Copyright (c) 2026 **Khalid Abdullah**. All rights reserved.

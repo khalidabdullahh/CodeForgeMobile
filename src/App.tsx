@@ -34,6 +34,7 @@ import {
   FilePlus2,
   FileText,
   Files,
+  Film,
   FolderOpen,
   FolderPlus,
   GitBranch,
@@ -76,6 +77,7 @@ import {
   Zap
 } from 'lucide-react';
 import { LandingPage } from './LandingPage';
+import { StykAnimeStudio } from './components/StykAnimeStudio';
 
 // True when running inside the installed Android app (not the browser)
 const isNativeApp = (() => {
@@ -84,7 +86,7 @@ const isNativeApp = (() => {
 
 export type FileItem = { id: string; name: string; path: string; language: string; content: string; modified?: boolean };
 type Extension = { id: string; name: string; description: string; installed: boolean };
-type View = 'editor' | 'preview' | 'extensions' | 'git' | 'settings' | 'ai' | 'templates' | 'github-sync' | 'liveshare';
+type View = 'editor' | 'preview' | 'extensions' | 'git' | 'settings' | 'ai' | 'templates' | 'github-sync' | 'liveshare' | 'stykanime';
 export type SidebarTab = 'explorer' | 'search' | 'git' | 'debug' | 'ai' | 'extensions' | 'settings';
 type ThemeName = 'vs-dark' | 'light' | 'dracula' | 'one-dark-pro' | 'monokai' | 'synthwave-84';
 type AiProvider = 'gemini' | 'openai';
@@ -2837,6 +2839,13 @@ if 'matplotlib.pyplot' in sys.modules:
         action: () => setView('templates')
       },
       {
+        id: 'view.stykanime',
+        category: 'View' as const,
+        title: 'View: Open StykAnime 2D Animation Studio',
+        icon: Film,
+        action: () => setView('stykanime')
+      },
+      {
         id: 'view.preview',
         category: 'View' as const,
         title: 'View: Open Fullscreen Runtime Preview',
@@ -3344,6 +3353,9 @@ if 'matplotlib.pyplot' in sys.modules:
               <button className="more-item" onClick={() => { setShowMoreMenu(false); setView('templates'); }}>
                 <Layers size={18} /> Starter templates
               </button>
+              <button className="more-item" onClick={() => { setShowMoreMenu(false); setView('stykanime'); }}>
+                <Film size={18} /> StykAnime 2D studio
+              </button>
               <button className="more-item" onClick={() => { setShowMoreMenu(false); executePalette('save'); }}>
                 <Save size={18} /> Save
               </button>
@@ -3421,6 +3433,16 @@ if 'matplotlib.pyplot' in sys.modules:
               onClick={() => handleActivityBarClick('settings')}
             >
               <Settings size={18} />
+            </button>
+            <button
+              className={`activity-btn ${view === 'stykanime' ? 'active' : ''}`}
+              title="StykAnime Studio (2D Stick Animation)"
+              onClick={() => {
+                setView('stykanime');
+                if (window.innerWidth < 768) setSidebar(false);
+              }}
+            >
+              <Film size={18} />
             </button>
             <button
               className="activity-btn"
@@ -4520,6 +4542,49 @@ if 'matplotlib.pyplot' in sys.modules:
               </div>
             </div>
             )
+          )}
+
+          {/* StykAnime 2D Animation Studio View */}
+          {view === 'stykanime' && (
+            <StykAnimeStudio
+              onClose={() => setView('editor')}
+              onExportToCode={(htmlContent, jsContent) => {
+                setFiles(prevFiles => {
+                  const updated = [...prevFiles];
+                  const htmlIdx = updated.findIndex(f => f.name === 'index.html' || f.path === 'index.html');
+                  if (htmlIdx >= 0) {
+                    updated[htmlIdx] = { ...updated[htmlIdx], content: htmlContent, modified: true };
+                  } else {
+                    updated.unshift({
+                      id: 'index',
+                      name: 'index.html',
+                      path: 'index.html',
+                      language: 'html',
+                      content: htmlContent,
+                      modified: true
+                    });
+                  }
+
+                  const jsIdx = updated.findIndex(f => f.name === 'stykanime-animation.js' || f.path === 'stykanime-animation.js');
+                  if (jsIdx >= 0) {
+                    updated[jsIdx] = { ...updated[jsIdx], content: jsContent, modified: true };
+                  } else {
+                    updated.push({
+                      id: 'stykanime-js-' + Date.now(),
+                      name: 'stykanime-animation.js',
+                      path: 'stykanime-animation.js',
+                      language: 'javascript',
+                      content: jsContent,
+                      modified: true
+                    });
+                  }
+                  return updated;
+                });
+                setActiveId('index');
+                setView('preview');
+                setPreviewKey(k => k + 1);
+              }}
+            />
           )}
 
           {/* Starter Project Templates View */}

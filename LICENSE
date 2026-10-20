@@ -1,21 +1,36 @@
-MIT License
+PROPRIETARY & SOURCE-AVAILABLE LICENSE
 
-Copyright (c) 2026 Khalid Abdullah
+Copyright (c) 2026 Khalid Abdullah. All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+NOTICE: All software, source code, designs, algorithms, user interfaces, and documentation 
+contained in this repository are the exclusive intellectual property of Khalid Abdullah.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+GRANT OF RIGHTS:
+1. Viewing, inspecting, and educational review of the source code through GitHub is permitted.
+2. Creating local forks and clones strictly for personal testing, evaluation, learning, or 
+   contributing back to this upstream repository is permitted.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+COMMUNITY CONTRIBUTIONS:
+Anyone is welcome to submit bug fixes, feature enhancements, documentation, or improvements 
+via GitHub Pull Requests. By submitting any contribution (including pull requests, code patches, 
+assets, or documentation) to this repository, you explicitly and irrevocably agree that:
+- Your submission is your original work or you have the full authority to submit it.
+- You grant Khalid Abdullah an irrevocable, perpetual, worldwide, non-exclusive, transferable, 
+  royalty-free license to merge, adapt, modify, compile, distribute, publish, and license 
+  the contribution as part of CodeForge Mobile or any related project.
+- Khalid Abdullah remains the sole owner, copyright holder, and intellectual property 
+  proprietor of the entire CodeForge Mobile project.
+
+RESTRICTIONS (NO UNAUTHORIZED COMMERCIAL EXPLOITATION):
+1. Commercial reproduction, distribution, sublicensing, reselling, or hosting of this software, 
+   in whole or in part, or any derivative works is STRICTLY PROHIBITED without prior written 
+   permission from Khalid Abdullah.
+2. Re-branding, re-publishing, or claiming ownership of this project, its code, or its brand 
+   under any other name or entity is strictly forbidden and protected under international copyright law.
+
+DISCLAIMER OF WARRANTY:
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
+PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY 
+CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, 
+ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

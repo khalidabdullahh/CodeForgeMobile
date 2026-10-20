@@ -896,6 +896,18 @@ function App() {
   const multiFileInputRef = useRef<HTMLInputElement>(null);
   const zipFileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
+  // Read the live editor text, but never trust an editor that has been unmounted/disposed
+  // (its getValue() returns '' and would wipe the file when Run is pressed from another view).
+  const readEditorValue = (fallback: string) => {
+    try {
+      const ed = editorRef.current;
+      const model = ed?.getModel?.();
+      if (ed && model && !(model.isDisposed && model.isDisposed())) return ed.getValue();
+    } catch {
+      /* fall through to the saved content */
+    }
+    return fallback;
+  };
   const monacoRef = useRef<any>(null);
 
   // Sticky Scroll & Breadcrumbs
@@ -1948,7 +1960,7 @@ if 'matplotlib.pyplot' in sys.modules:
     if (!active) return;
     const lang = active.language || languageFor(active.name);
     const name = active.name.toLowerCase();
-    const liveCode = editorRef.current ? editorRef.current.getValue() : active.content;
+    const liveCode = readEditorValue(active.content);
 
     // Immediately sync and auto-save
     setFiles(prev => prev.map(f => (f.id === active.id ? { ...f, content: liveCode, modified: false } : f)));
@@ -2524,7 +2536,7 @@ if 'matplotlib.pyplot' in sys.modules:
 
   const formatFile = () => {
     if (!active) return;
-    const content = editorRef.current ? editorRef.current.getValue() : active.content;
+    const content = readEditorValue(active.content);
     const lang = active.language;
     let formatted = content;
 
@@ -3160,6 +3172,27 @@ if 'matplotlib.pyplot' in sys.modules:
     return () => window.removeEventListener('keydown', handler);
   }, [activeId]);
 
+  // Always show the desktop IDE layout, even on a phone in portrait:
+  // lay the page out ~820px wide and let the browser scale it to fit the screen.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) return;
+    const original = meta.getAttribute('content') || 'width=device-width, initial-scale=1.0';
+    const apply = () => {
+      const deviceWidth = window.screen.width || window.innerWidth;
+      const next = inIdeMode && deviceWidth < 820 ? 'width=820, user-scalable=no' : original;
+      if (meta.getAttribute('content') !== next) meta.setAttribute('content', next);
+    };
+    apply();
+    window.addEventListener('orientationchange', apply);
+    window.addEventListener('resize', apply);
+    return () => {
+      window.removeEventListener('orientationchange', apply);
+      window.removeEventListener('resize', apply);
+      meta.setAttribute('content', original);
+    };
+  }, [inIdeMode]);
+
   // If user is on landing page view
   if (!inIdeMode) {
     return (
@@ -3175,7 +3208,7 @@ if 'matplotlib.pyplot' in sys.modules:
   const htmlFile = activeIsHtml
     ? active
     : (files.find(f => f.name === 'index.html' || f.path.endsWith('index.html')) || files.find(f => f.language === 'html' || f.name.endsWith('.html')));
-  const rawHtml = htmlFile?.content || (active?.content && activeIsHtml ? active.content : '<h1>No HTML file selected</h1><p>Open or create an .html file to preview.</p>');
+  const rawHtml = htmlFile ? htmlFile.content : '<h1>No HTML file selected</h1><p>Open or create an .html file to preview.</p>';
 
   const sanitizePreviewHtml = (rawDoc: string) => {
     try {

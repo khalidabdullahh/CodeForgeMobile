@@ -68,7 +68,7 @@ export interface AnimeFrame {
 
 export interface StykAnimeStudioProps {
   onClose: () => void;
-  onExportToCode: (htmlContent: string, jsContent: string) => void;
+  onExportToCode: (htmlContent: string, jsContent: string, cssContent: string) => void;
 }
 
 // Preset generator helpers
@@ -180,7 +180,16 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
   const [frames, setFrames] = useState<AnimeFrame[]>(() => {
     try {
       const saved = localStorage.getItem('cf_stykanime_frames');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const valid =
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed.every(
+            (f: any) => f && Array.isArray(f.characters) && f.characters.length > 0 && Array.isArray(f.effects)
+          );
+        if (valid) return parsed;
+      }
     } catch {
       // Fallback
     }
@@ -206,6 +215,11 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
     }
   }, [frames]);
 
+  // Keep the selected frame index inside the timeline if frames were removed
+  useEffect(() => {
+    setCurrentFrameIdx(prev => (prev >= frames.length ? Math.max(0, frames.length - 1) : prev));
+  }, [frames.length]);
+
   // Current active frame
   const currentFrame = frames[currentFrameIdx] || frames[0];
 
@@ -224,6 +238,7 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
     setFrames(prevFrames => {
       const copy = JSON.parse(JSON.stringify(prevFrames)) as AnimeFrame[];
       const cur = copy[currentFrameIdx];
+      if (!cur) return prevFrames;
       const char = cur.characters.find(c => c.id === selectedCharId);
       if (!char) return prevFrames;
 
@@ -352,7 +367,7 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
       const copy = JSON.parse(JSON.stringify(prev)) as AnimeFrame[];
       const last = copy[currentFrameIdx] || copy[copy.length - 1];
       const newFrame: AnimeFrame = {
-        id: 'f_' + Date.now(),
+        id: 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
         characters: JSON.parse(JSON.stringify(last.characters)),
         effects: JSON.parse(JSON.stringify(last.effects))
       };
@@ -376,16 +391,17 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
 
   // Toggle Opponent
   const toggleOpponent = () => {
+    const hasOpponent = !!currentFrame?.characters.some(c => c.id === 'opponent');
+    setSelectedCharId(hasOpponent ? 'hero' : 'opponent');
     setFrames(prev => {
       const copy = JSON.parse(JSON.stringify(prev)) as AnimeFrame[];
       const cur = copy[currentFrameIdx];
+      if (!cur) return prev;
       const oppIdx = cur.characters.findIndex(c => c.id === 'opponent');
       if (oppIdx >= 0) {
         cur.characters.splice(oppIdx, 1);
-        setSelectedCharId('hero');
       } else {
         cur.characters.push(createDefaultOpponent(430, 250));
-        setSelectedCharId('opponent');
       }
       return copy;
     });
@@ -395,7 +411,7 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
   const toggleAura = () => {
     setFrames(prev => {
       const copy = JSON.parse(JSON.stringify(prev)) as AnimeFrame[];
-      const char = copy[currentFrameIdx].characters.find(c => c.id === selectedCharId);
+      const char = copy[currentFrameIdx]?.characters.find(c => c.id === selectedCharId);
       if (char) char.hasAura = !char.hasAura;
       return copy;
     });
@@ -405,7 +421,7 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
   const toggleWeapon = () => {
     setFrames(prev => {
       const copy = JSON.parse(JSON.stringify(prev)) as AnimeFrame[];
-      const char = copy[currentFrameIdx].characters.find(c => c.id === selectedCharId);
+      const char = copy[currentFrameIdx]?.characters.find(c => c.id === selectedCharId);
       if (char) char.hasWeapon = !char.hasWeapon;
       return copy;
     });
@@ -731,17 +747,24 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
 
     const { charId, jointKey, startPos } = draggingJointRef.current;
 
+    // Work out the drag delta here (not inside the state updater): React may batch several
+    // pointer events before running updaters, which made the body move faster than the finger.
+    let dx = 0;
+    let dy = 0;
+    if (jointKey === 'ROOT') {
+      dx = px - startPos.x;
+      dy = py - startPos.y;
+      draggingJointRef.current.startPos = { x: px, y: py };
+    }
+
     setFrames(prevFrames => {
       const copy = JSON.parse(JSON.stringify(prevFrames)) as AnimeFrame[];
       const cur = copy[currentFrameIdx];
+      if (!cur) return prevFrames;
       const char = cur.characters.find(c => c.id === charId);
       if (!char) return prevFrames;
 
       if (jointKey === 'ROOT') {
-        const dx = px - startPos.x;
-        const dy = py - startPos.y;
-        draggingJointRef.current!.startPos = { x: px, y: py };
-
         const allKeys: Array<keyof StickFigure> = [
           'head',
           'neck',
@@ -1084,18 +1107,32 @@ renderFrame();
 requestAnimationFrame(loop);
 `;
 
-    onExportToCode(htmlCode, jsCode);
+    // Preview/Run only reads the page body, so the styles live in their own .css file
+    const styleMatch = htmlCode.match(/<style>([\s\S]*?)<\/style>/);
+    const cssFile = styleMatch ? styleMatch[1].replace(/^\n+|\s+$/g, '') + '\n' : '';
+    const htmlFile = htmlCode.replace(
+      /<style>[\s\S]*?<\/style>/,
+      '<link rel="stylesheet" href="stykanime-animation.css">'
+    );
+    // Wrap in a function so its variable names can never clash with the user's own scripts
+    const jsFile = '(function () {\n' + jsCode + '\n})();\n';
+
+    onExportToCode(htmlFile, jsFile, cssFile);
     setExportedNotify(true);
     setTimeout(() => setExportedNotify(false), 2500);
   };
 
   // Download JSON
   const downloadJSON = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(frames, null, 2));
+    const blob = new Blob([JSON.stringify(frames, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = dataStr;
+    a.href = url;
     a.download = `stykanime-animation-${Date.now()}.json`;
+    document.body.appendChild(a);
     a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const selectedChar = currentFrame?.characters.find(c => c.id === selectedCharId) || currentFrame?.characters[0];

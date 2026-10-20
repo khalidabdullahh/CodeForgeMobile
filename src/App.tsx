@@ -4581,39 +4581,29 @@ if 'matplotlib.pyplot' in sys.modules:
           {view === 'stykanime' && (
             <StykAnimeStudio
               onClose={() => setView('editor')}
-              onExportToCode={(htmlContent, jsContent) => {
+              onExportToCode={(htmlContent, jsContent, cssContent) => {
+                // Write to dedicated files so the user's own index.html is never overwritten
+                const targets = [
+                  { path: 'stykanime.html', fallbackId: 'stykanime-html', language: 'html', content: htmlContent },
+                  { path: 'stykanime-animation.css', fallbackId: 'stykanime-css', language: 'css', content: cssContent },
+                  { path: 'stykanime-animation.js', fallbackId: 'stykanime-js', language: 'javascript', content: jsContent }
+                ].map(t => ({ ...t, id: files.find(f => f.path === t.path)?.id || t.fallbackId }));
+
                 setFiles(prevFiles => {
                   const updated = [...prevFiles];
-                  const htmlIdx = updated.findIndex(f => f.name === 'index.html' || f.path === 'index.html');
-                  if (htmlIdx >= 0) {
-                    updated[htmlIdx] = { ...updated[htmlIdx], content: htmlContent, modified: true };
-                  } else {
-                    updated.unshift({
-                      id: 'index',
-                      name: 'index.html',
-                      path: 'index.html',
-                      language: 'html',
-                      content: htmlContent,
-                      modified: true
-                    });
-                  }
-
-                  const jsIdx = updated.findIndex(f => f.name === 'stykanime-animation.js' || f.path === 'stykanime-animation.js');
-                  if (jsIdx >= 0) {
-                    updated[jsIdx] = { ...updated[jsIdx], content: jsContent, modified: true };
-                  } else {
-                    updated.push({
-                      id: 'stykanime-js-' + Date.now(),
-                      name: 'stykanime-animation.js',
-                      path: 'stykanime-animation.js',
-                      language: 'javascript',
-                      content: jsContent,
-                      modified: true
-                    });
-                  }
+                  targets.forEach(t => {
+                    const idx = updated.findIndex(f => f.path === t.path);
+                    if (idx >= 0) {
+                      updated[idx] = { ...updated[idx], content: t.content, modified: true };
+                    } else {
+                      updated.push({ id: t.id, name: t.path, path: t.path, language: t.language, content: t.content, modified: true });
+                    }
+                  });
                   return updated;
                 });
-                setActiveId('index');
+                const htmlId = targets[0].id;
+                setOpenTabs(prev => (prev.includes(htmlId) ? prev : [...prev, htmlId]));
+                setActiveId(htmlId);
                 setView('preview');
                 setPreviewKey(k => k + 1);
               }}

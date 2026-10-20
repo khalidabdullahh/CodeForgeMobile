@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import MonacoEditorRaw, { Editor as MonacoEditorNamed, DiffEditor as MonacoDiffNamed, OnMount } from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
+import { saveFile } from './utils/saveFile';
 
 // Resilient fallback for ESM/CJS interop so Editor & DiffEditor are always valid React components
 const Editor: any = (MonacoEditorRaw as any)?.default || MonacoEditorNamed || MonacoEditorRaw;
@@ -2344,12 +2346,7 @@ if 'matplotlib.pyplot' in sys.modules:
       const zip = new JSZip();
       files.forEach(f => zip.file(f.path, f.content));
       const blob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'codeforge-project.zip';
-      a.click();
-      URL.revokeObjectURL(url);
+      await saveFile(blob, 'codeforge-project.zip', 'application/zip');
       setTerminal(prev => `${prev}\n✓ Exported ZIP archive with ${files.length} files`);
     } catch (err) {
       setTerminal(prev => `${prev}\n✗ Failed to create ZIP archive`);
@@ -2522,15 +2519,11 @@ if 'matplotlib.pyplot' in sys.modules:
       2
     );
     const readme = '# CodeForge Mobile Android Build\n\n1. Run `npm run build`\n2. Open Android Studio via Capacitor\n3. Build APK/AAB.';
-    [['capacitor.config.json', cap], ['ANDROID-BUILD.md', readme]].forEach(([name, body]) => {
-      const blob = new Blob([body], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    (async () => {
+      for (const [name, body] of [['capacitor.config.json', cap], ['ANDROID-BUILD.md', readme]]) {
+        await saveFile(body, name);
+      }
+    })();
     setTerminal(prev => `${prev}\n✓ Android packaging files exported`);
   };
 
@@ -3172,6 +3165,26 @@ if 'matplotlib.pyplot' in sys.modules:
     return () => window.removeEventListener('keydown', handler);
   }, [activeId]);
 
+  // Android back button: close menus first, then return to the editor, then minimise (never lose work)
+  const backStateRef = useRef({ palette: false, more: false, view: 'editor' as string });
+  backStateRef.current = { palette, more: showMoreMenu, view };
+  useEffect(() => {
+    if (!isNativeApp) return;
+    let remove: (() => void) | undefined;
+    CapacitorApp.addListener('backButton', () => {
+      const st = backStateRef.current;
+      if (st.palette) setPalette(false);
+      else if (st.more) setShowMoreMenu(false);
+      else if (st.view !== 'editor') setView('editor');
+      else CapacitorApp.minimizeApp().catch(() => {});
+    })
+      .then(handle => {
+        remove = () => handle.remove();
+      })
+      .catch(() => {});
+    return () => remove?.();
+  }, []);
+
   // Always show the desktop IDE layout, even on a phone in portrait:
   // lay the page out ~820px wide and let the browser scale it to fit the screen.
   useEffect(() => {
@@ -3569,13 +3582,7 @@ if 'matplotlib.pyplot' in sys.modules:
                             title="Download File"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = file.name;
-                              a.click();
-                              URL.revokeObjectURL(url);
+                              saveFile(file.content, file.name);
                               setTerminal(prev => `${prev}\n✓ Downloaded file: ${file.name}`);
                             }}
                           >
@@ -5645,13 +5652,7 @@ if 'matplotlib.pyplot' in sys.modules:
               <button
                 className="tab-menu-item"
                 onClick={() => {
-                  const blob = new Blob([showFileMenu.content], { type: 'text/plain;charset=utf-8' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = showFileMenu.name;
-                  a.click();
-                  URL.revokeObjectURL(url);
+                  saveFile(showFileMenu.content, showFileMenu.name);
                   setTerminal(prev => `${prev}\n✓ Downloaded file: ${showFileMenu.name}`);
                   setShowFileMenu(null);
                 }}

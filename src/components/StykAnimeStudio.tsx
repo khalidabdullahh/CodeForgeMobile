@@ -19,6 +19,7 @@ import {
   Users,
   Check
 } from 'lucide-react';
+import { saveFile } from '../utils/saveFile';
 
 export interface Joint {
   x: number;
@@ -1124,15 +1125,7 @@ requestAnimationFrame(loop);
 
   // Download JSON
   const downloadJSON = () => {
-    const blob = new Blob([JSON.stringify(frames, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `stykanime-animation-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    saveFile(JSON.stringify(frames, null, 2), `stykanime-animation-${Date.now()}.json`, 'application/json');
   };
 
   const selectedChar = currentFrame?.characters.find(c => c.id === selectedCharId) || currentFrame?.characters[0];

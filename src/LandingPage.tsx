@@ -29,6 +29,55 @@ interface LandingPageProps {
 
 const TYPEWRITER_WORDS = ['Build', 'Create', 'Code', 'Deploy', 'Ship'];
 
+const GITHUB_REPO_API = 'https://api.github.com/repos/khalidabdullahh/CodeForgeMobile';
+const STARS_CACHE_KEY = 'codeforge-gh-stars';
+const STARS_CACHE_MS = 30 * 60 * 1000;
+
+function formatStars(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : String(n);
+}
+
+// Live GitHub star count (cached for 30 min to stay inside the unauthenticated API rate limit)
+function useGithubStars(): number | null {
+  const [stars, setStars] = useState<number | null>(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(STARS_CACHE_KEY) || 'null');
+      return cached && Number.isFinite(cached.count) ? cached.count : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    try {
+      const cached = JSON.parse(localStorage.getItem(STARS_CACHE_KEY) || 'null');
+      if (cached && Date.now() - cached.ts < STARS_CACHE_MS) return;
+    } catch {
+      /* ignore bad cache */
+    }
+    fetch(GITHUB_REPO_API, { headers: { Accept: 'application/vnd.github+json' } })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(data => {
+        if (cancelled || !Number.isFinite(data?.stargazers_count)) return;
+        setStars(data.stargazers_count);
+        try {
+          localStorage.setItem(STARS_CACHE_KEY, JSON.stringify({ count: data.stargazers_count, ts: Date.now() }));
+        } catch {
+          /* storage unavailable */
+        }
+      })
+      .catch(() => {
+        /* offline or rate limited: keep cached value or show no count */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return stars;
+}
+
 const APK_URL =
   'https://github.com/khalidabdullahh/CodeForgeMobile/releases/download/apk-latest/CodeForgeMobile.apk';
 const RELEASES_URL = 'https://github.com/khalidabdullahh/CodeForgeMobile/releases';
@@ -85,6 +134,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onDownloadZip,
   onExportAndroid
 }) => {
+  const stars = useGithubStars();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
 
@@ -365,6 +415,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             >
               <Github size={16} />
               <span>Star Repo</span>
+              {stars !== null && (
+                <b className="star-count">
+                  <Star size={12} /> {formatStars(stars)}
+                </b>
+              )}
             </a>
             <a className="install-nav-btn" href={APK_URL} download rel="noreferrer">
               <Download size={15} />
@@ -417,6 +472,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           >
             <Github size={17} />
             <span>Star on GitHub</span>
+            {stars !== null && (
+              <b className="star-count">
+                <Star size={12} /> {formatStars(stars)}
+              </b>
+            )}
           </a>
         </div>
 
@@ -686,7 +746,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               style={{ background: '#2563eb', color: 'white' }}
             >
               <Star size={20} />
-              <span>Star on GitHub ⭐️</span>
+              <span>Star on GitHub{stars !== null ? ` · ${formatStars(stars)}` : ' ⭐️'}</span>
             </a>
             <button
               className="coffee-main-button"

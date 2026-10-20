@@ -4568,3 +4568,33 @@ a.tile-btn {
     display: none;
   }
 }
+
+
+/* GitHub star counter badge */
+.star-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.14);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  color: #facc15;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.star-count svg {
+  fill: currentColor;
+}
+@media (max-width: 640px) {
+  .github-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .github-btn .star-count {
+    margin-left: 0;
+  }
+}

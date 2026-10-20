@@ -29,6 +29,10 @@ interface LandingPageProps {
 
 const TYPEWRITER_WORDS = ['Build', 'Create', 'Code', 'Deploy', 'Ship'];
 
+const APK_URL =
+  'https://github.com/khalidabdullahh/CodeForgeMobile/releases/download/apk-latest/CodeForgeMobile.apk';
+const RELEASES_URL = 'https://github.com/khalidabdullahh/CodeForgeMobile/releases';
+
 const MOCK_SNIPPETS = [
   {
     lang: 'HTML',
@@ -362,10 +366,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <Github size={16} />
               <span>Star Repo</span>
             </a>
-            <button className="install-nav-btn" onClick={handleInstallClick}>
+            <a className="install-nav-btn" href={APK_URL} download rel="noreferrer">
               <Download size={15} />
-              <span>Install App (APK)</span>
-            </button>
+              <span>Download APK</span>
+            </a>
           </div>
         </div>
       </nav>
@@ -400,10 +404,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <ArrowRight size={18} />
           </button>
 
-          <button className="cta-install" onClick={handleInstallClick}>
+          <a className="cta-install" href={APK_URL} download rel="noreferrer">
             <Download size={18} />
-            <span>Install App (APK)</span>
-          </button>
+            <span>Download Android APK</span>
+          </a>
 
           <a
             href="https://github.com/khalidabdullahh/CodeForgeMobile"
@@ -617,6 +621,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <div className="download-options">
             <div className="download-tile anim-card">
+              <Smartphone size={28} />
+              <h4>Android App (APK)</h4>
+              <p>Download the ready-to-install app and open it on your Android phone. Allow "Install unknown apps" when asked.</p>
+              <a className="tile-btn" href={APK_URL} download rel="noreferrer">
+                <Download size={15} /> Download APK
+              </a>
+              <a className="tile-link" href={RELEASES_URL} target="_blank" rel="noreferrer">
+                All releases
+              </a>
+            </div>
+
+            <div className="download-tile anim-card">
               <Globe size={28} />
               <h4>1-Click Install App (PWA)</h4>
               <p>Install directly to your Android home screen for instant offline use.</p>
@@ -761,13 +777,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               <div className="modal-buttons" style={{ flexDirection: 'column' }}>
                 <a
-                  href="https://github.com/khalidabdullahh/CodeForgeMobile/releases"
-                  target="_blank"
+                  href={APK_URL}
+                  download
                   rel="noreferrer"
                   className="modal-btn-primary"
                   style={{ textDecoration: 'none' }}
                 >
-                  <Download size={16} /> Download APK from GitHub Releases
+                  <Download size={16} /> Download Android APK
                 </a>
 
                 <div className="flex gap-2 w-full">

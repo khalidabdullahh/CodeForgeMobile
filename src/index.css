@@ -3612,9 +3612,6 @@ button, input, textarea, select {
   .brand small {
     display: none;
   }
-  .top-actions .icon-btn:nth-last-of-type(1) {
-    display: none;
-  }
   .editor-container.split-mode {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
@@ -4313,3 +4310,178 @@ button, input, textarea, select {
   }
 }
 
+
+
+/* ===================================================================
+   Mobile-friendly overrides (IDE + landing page)
+   =================================================================== */
+a.install-nav-btn,
+a.cta-install,
+a.tile-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.tile-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #7aa7ff;
+  text-decoration: underline;
+}
+.landing-container {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+.download-options {
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+}
+
+@media (max-width: 768px) {
+  /* IDE: top bar scrolls sideways instead of overflowing off-screen */
+  .topbar {
+    padding: 0 6px;
+    gap: 6px;
+  }
+  .topbar-left {
+    flex: 0 0 auto;
+    gap: 4px;
+  }
+  .brand span {
+    display: none;
+  }
+  .top-actions {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .top-actions::-webkit-scrollbar {
+    display: none;
+  }
+  .top-actions > * {
+    flex: 0 0 auto;
+  }
+  .action-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .action-btn span {
+    max-width: 92px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* IDE: editor toolbar + breadcrumbs fit one line and scroll if needed */
+  .editor-head {
+    padding: 0 8px;
+    gap: 8px;
+  }
+  .editor-head > span {
+    min-width: 0;
+    max-width: 30%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .editor-controls {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-end;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .editor-controls::-webkit-scrollbar {
+    display: none;
+  }
+  .editor-controls > * {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .editor-breadcrumbs {
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .breadcrumb-trail {
+    flex: 1 1 auto;
+  }
+  .breadcrumb-actions {
+    flex: 0 0 auto;
+  }
+  .breadcrumb-item.root > span {
+    display: none;
+  }
+  .landscape-banner {
+    padding: 6px 10px;
+    gap: 8px;
+    font-size: 10.5px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Landing page */
+  .nav-content {
+    padding: 10px 14px;
+    gap: 8px;
+  }
+  .nav-actions {
+    gap: 6px;
+  }
+  .github-btn span {
+    display: none;
+  }
+  .github-btn {
+    padding: 8px 10px;
+  }
+  .install-nav-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .hero-section {
+    padding: 34px 16px 28px;
+  }
+  .hero-badge {
+    font-size: 11px;
+    line-height: 1.4;
+    text-align: center;
+    max-width: 100%;
+  }
+  .hero-subtitle {
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .hero-cta-group {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+  .hero-cta-group > * {
+    width: 100%;
+    justify-content: center;
+  }
+  .download-card {
+    padding: 28px 14px;
+  }
+  .download-options {
+    grid-template-columns: 1fr;
+  }
+  .tile-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .modal-panel {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+}

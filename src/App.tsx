@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import MonacoEditorRaw, { Editor as MonacoEditorNamed, DiffEditor as MonacoDiffNamed, OnMount } from '@monaco-editor/react';
 import JSZip from 'jszip';
+import { Capacitor } from '@capacitor/core';
 
 // Resilient fallback for ESM/CJS interop so Editor & DiffEditor are always valid React components
 const Editor: any = (MonacoEditorRaw as any)?.default || MonacoEditorNamed || MonacoEditorRaw;
@@ -75,6 +76,11 @@ import {
   Zap
 } from 'lucide-react';
 import { LandingPage } from './LandingPage';
+
+// True when running inside the installed Android app (not the browser)
+const isNativeApp = (() => {
+  try { return Capacitor.isNativePlatform(); } catch { return false; }
+})();
 
 export type FileItem = { id: string; name: string; path: string; language: string; content: string; modified?: boolean };
 type Extension = { id: string; name: string; description: string; installed: boolean };
@@ -736,7 +742,7 @@ const themeBgMap: Record<ThemeName, string> = {
 
 function App() {
   const [inIdeMode, setInIdeMode] = useState<boolean>(() => {
-    return window.location.search.includes('mode=ide') || window.location.hash === '#ide';
+    return isNativeApp || window.location.search.includes('mode=ide') || window.location.hash === '#ide';
   });
 
   const [files, setFiles] = useState<FileItem[]>(() => {
@@ -798,6 +804,7 @@ function App() {
   const [previewKey, setPreviewKey] = useState(0);
   const [splitPreview, setSplitPreview] = useState(false);
   const [palette, setPalette] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [paletteSearchQuery, setPaletteSearchQuery] = useState('');
   const [paletteCategoryFilter, setPaletteCategoryFilter] = useState<'all' | 'file' | 'edit' | 'view' | 'preferences' | 'run' | 'git'>('all');
   const [paletteActiveIndex, setPaletteActiveIndex] = useState(0);
@@ -3230,9 +3237,11 @@ if 'matplotlib.pyplot' in sys.modules:
       {/* Top Navigation Bar */}
       <header className="topbar">
         <div className="topbar-left">
-          <button className="icon-btn" title="Back to Home / Landing Page" onClick={() => setInIdeMode(false)}>
-            <Home size={17} />
-          </button>
+          {!isNativeApp && (
+            <button className="icon-btn" title="Back to Home / Landing Page" onClick={() => setInIdeMode(false)}>
+              <Home size={17} />
+            </button>
+          )}
           <button className="icon-btn" aria-label="Open explorer" onClick={() => setSidebar(v => !v)}>
             <Menu size={19} />
           </button>
@@ -3252,7 +3261,7 @@ if 'matplotlib.pyplot' in sys.modules:
             <kbd>⌘P</kbd>
           </button>
 
-          <button className="icon-btn templates-top-btn" title="Starter Templates" onClick={() => setView('templates')}>
+          <button className="icon-btn templates-top-btn top-secondary" title="Starter Templates" onClick={() => setView('templates')}>
             <Layers size={17} />
           </button>
 
@@ -3267,24 +3276,35 @@ if 'matplotlib.pyplot' in sys.modules:
                 ? 'Running...'
                 : (view === 'preview'
                     ? 'Editor'
-                    : `Run ${active?.name ? `(${active.name})` : ''}`)}
+                    : 'Run')}
+              {!pyRunning && view !== 'preview' && active?.name && (
+                <em className="run-file hide-on-mobile">({active.name})</em>
+              )}
             </span>
           </button>
 
           <button className="icon-btn ai-badge-btn" title="AI Copilot" onClick={() => setView('ai')}>
             <Bot size={17} />
           </button>
-          <button className="icon-btn" title="Save" onClick={() => executePalette('save')}>
+          <button className="icon-btn top-secondary" title="Save" onClick={() => executePalette('save')}>
             <Save size={17} />
           </button>
-          <button className="icon-btn" title="Export ZIP" onClick={exportProjectZip}>
+          <button className="icon-btn top-secondary" title="Export ZIP" onClick={exportProjectZip}>
             <Download size={18} />
           </button>
-          <button className="icon-btn" title="Share Project / Code URL" onClick={generateShareLink}>
+          <button className="icon-btn top-secondary" title="Share Project / Code URL" onClick={generateShareLink}>
             <Share2 size={17} />
           </button>
-          <button className="icon-btn" title="Import Project / Files" onClick={() => setShowImportModal(true)}>
+          <button className="icon-btn top-secondary" title="Import Project / Files" onClick={() => setShowImportModal(true)}>
             <Upload size={18} />
+          </button>
+          <button
+            className="icon-btn more-btn"
+            aria-label="More actions"
+            aria-expanded={showMoreMenu}
+            onClick={() => setShowMoreMenu(v => !v)}
+          >
+            <MoreVertical size={19} />
           </button>
           <input
             ref={folderInputRef}
@@ -3310,6 +3330,35 @@ if 'matplotlib.pyplot' in sys.modules:
             onChange={handleZipUpload}
           />
         </div>
+      
+        {showMoreMenu && (
+          <>
+            <div className="more-backdrop" onClick={() => setShowMoreMenu(false)} />
+            <div className="more-menu" role="menu">
+              <button className="more-item" onClick={() => { setShowMoreMenu(false); formatFile(); }}>
+                <Wand2 size={18} /> Format code
+              </button>
+              <button className="more-item" onClick={() => { setShowMoreMenu(false); setSplitPreview(v => !v); }}>
+                <Columns size={18} /> Split preview
+              </button>
+              <button className="more-item" onClick={() => { setShowMoreMenu(false); setView('templates'); }}>
+                <Layers size={18} /> Starter templates
+              </button>
+              <button className="more-item" onClick={() => { setShowMoreMenu(false); executePalette('save'); }}>
+                <Save size={18} /> Save
+              </button>
+              <button className="more-item" onClick={() => { setShowMoreMenu(false); exportProjectZip(); }}>
+                <Download size={18} /> Export project (.zip)
+              </button>
+              <button className="more-item" onClick={() => { setShowMoreMenu(false); generateShareLink(); }}>
+                <Share2 size={18} /> Share project link
+              </button>
+              <button className="more-item" onClick={() => { setShowMoreMenu(false); setShowImportModal(true); }}>
+                <Upload size={18} /> Import files
+              </button>
+            </div>
+          </>
+        )}
       </header>
 
       {/* Main Workspace Area */}

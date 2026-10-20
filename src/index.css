@@ -4355,14 +4355,8 @@ a.tile-btn {
   .top-actions {
     flex: 1 1 auto;
     min-width: 0;
-    justify-content: flex-start;
+    justify-content: flex-end;
     gap: 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .top-actions::-webkit-scrollbar {
-    display: none;
   }
   .top-actions > * {
     flex: 0 0 auto;
@@ -4483,5 +4477,94 @@ a.tile-btn {
   .modal-panel {
     width: calc(100vw - 24px);
     max-width: calc(100vw - 24px);
+  }
+}
+
+
+/* ===================================================================
+   Mobile IDE redesign: compact top bar + "more" menu
+   =================================================================== */
+.topbar {
+  position: relative;
+  z-index: 50;
+}
+.more-btn {
+  display: none !important;
+}
+.run-file {
+  font-style: normal;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.more-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  background: rgba(0, 0, 0, 0.25);
+}
+.more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 8px;
+  z-index: 60;
+  min-width: 230px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--bg-secondary, #11151b);
+  border: 1px solid var(--border-color, #2a3140);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+}
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-main, #d7dee8);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.more-item:hover,
+.more-item:active {
+  background: rgba(22, 131, 255, 0.16);
+}
+
+@media (max-width: 768px) {
+  .top-secondary {
+    display: none !important;
+  }
+  .more-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+  .topbar {
+    height: 48px;
+    flex-basis: 48px;
+  }
+  .action-btn {
+    padding: 0 12px;
+    height: 34px;
+    border-radius: 9px;
+  }
+  /* The tab bar already shows the file and the top bar already has Run,
+     so the extra editor header row only wastes screen space on phones. */
+  .editor-head {
+    display: none;
+  }
+  .breadcrumb-pos {
+    display: none;
+  }
+}
+@media (max-width: 380px) {
+  .brand {
+    display: none;
   }
 }

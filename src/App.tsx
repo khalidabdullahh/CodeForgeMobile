@@ -641,6 +641,14 @@ const quickSymbols = [
   { label: '@', insert: '@' }
 ];
 
+// Safe localStorage wrappers: storage can throw (quota exceeded, private mode, blocked access)
+function safeGet(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function safeSet(key: string, value: string): void {
+  try { localStorage.setItem(key, value); } catch { /* storage unavailable or full */ }
+}
+
 function languageFor(name: string) {
   const ext = name.split('.').pop()?.toLowerCase();
   return (
@@ -733,7 +741,7 @@ function App() {
 
   const [files, setFiles] = useState<FileItem[]>(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('codeforge-files') || 'null');
+      const saved = JSON.parse(safeGet('codeforge-files') || 'null');
       return Array.isArray(saved) && saved.length ? saved : defaultStarterFiles;
     } catch {
       return defaultStarterFiles;
@@ -771,7 +779,8 @@ function App() {
   const [view, setView] = useState<View>('editor');
   const [extensions, setExtensions] = useState<Extension[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('codeforge-extensions') || 'null') || defaultExtensions;
+      const saved = JSON.parse(safeGet('codeforge-extensions') || 'null');
+      return Array.isArray(saved) && saved.length ? saved : defaultExtensions;
     } catch {
       return defaultExtensions;
     }
@@ -779,7 +788,8 @@ function App() {
   const [gitMessage, setGitMessage] = useState('Update workspace');
   const [gitHistory, setGitHistory] = useState<string[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('codeforge-git') || 'null') || ['Initial workspace snapshot'];
+      const saved = JSON.parse(safeGet('codeforge-git') || 'null');
+      return Array.isArray(saved) && saved.length ? saved : ['Initial workspace snapshot'];
     } catch {
       return ['Initial workspace snapshot'];
     }
@@ -792,9 +802,12 @@ function App() {
   const [paletteCategoryFilter, setPaletteCategoryFilter] = useState<'all' | 'file' | 'edit' | 'view' | 'preferences' | 'run' | 'git'>('all');
   const [paletteActiveIndex, setPaletteActiveIndex] = useState(0);
   const [renameId, setRenameId] = useState<string | null>(null);
-  const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem('codeforge-font') || 13));
+  const [fontSize, setFontSize] = useState(() => {
+    const n = Number(safeGet('codeforge-font') || 13);
+    return Number.isFinite(n) && n > 0 ? n : 13;
+  });
   const [wordWrap, setWordWrap] = useState(true);
-  const [theme, setTheme] = useState<ThemeName>(() => (localStorage.getItem('codeforge-theme') as ThemeName) || 'vs-dark');
+  const [theme, setTheme] = useState<ThemeName>(() => (safeGet('codeforge-theme') as ThemeName) || 'vs-dark');
   const [diagnostics, setDiagnostics] = useState('No problems detected.');
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
 
@@ -814,7 +827,7 @@ function App() {
       return '';
     }
   });
-  const [ghRepoInput, setGhRepoInput] = useState(() => localStorage.getItem('codeforge-gh-repo') || 'khalidabdullahh/CodeForgeMobile');
+  const [ghRepoInput, setGhRepoInput] = useState(() => safeGet('codeforge-gh-repo') || 'khalidabdullahh/CodeForgeMobile');
   const [ghLoading, setGhLoading] = useState(false);
   const [ghStatusMsg, setGhStatusMsg] = useState('');
 
@@ -827,7 +840,7 @@ function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const queryRoom = urlParams.get('room');
       if (queryRoom) return queryRoom;
-      return localStorage.getItem('codeforge-liveshare-id') || 'forge-room-101';
+      return safeGet('codeforge-liveshare-id') || 'forge-room-101';
     } catch {
       return 'forge-room-101';
     }
@@ -845,9 +858,9 @@ function App() {
   filesRef.current = files;
 
   // AI State
-  const [aiProvider, setAiProvider] = useState<AiProvider>(() => (localStorage.getItem('codeforge-ai-provider') as AiProvider) || 'gemini');
-  const [aiApiKey, setAiApiKey] = useState(() => localStorage.getItem('codeforge-ai-key') || '');
-  const [aiCustomEndpoint, setAiCustomEndpoint] = useState(() => localStorage.getItem('codeforge-ai-endpoint') || 'https://api.openai.com/v1');
+  const [aiProvider, setAiProvider] = useState<AiProvider>(() => (safeGet('codeforge-ai-provider') as AiProvider) || 'gemini');
+  const [aiApiKey, setAiApiKey] = useState(() => safeGet('codeforge-ai-key') || '');
+  const [aiCustomEndpoint, setAiCustomEndpoint] = useState(() => safeGet('codeforge-ai-endpoint') || 'https://api.openai.com/v1');
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([
     {
       role: 'assistant',
@@ -878,10 +891,10 @@ function App() {
 
   // Sticky Scroll & Breadcrumbs
   const [stickyScroll, setStickyScroll] = useState<boolean>(() => {
-    return localStorage.getItem('codeforge-sticky-scroll') !== 'false';
+    return safeGet('codeforge-sticky-scroll') !== 'false';
   });
   const [breadcrumbsEnabled, setBreadcrumbsEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('codeforge-breadcrumbs') !== 'false';
+    return safeGet('codeforge-breadcrumbs') !== 'false';
   });
   const [currentCursor, setCurrentCursor] = useState<{ line: number; column: number }>({ line: 1, column: 1 });
   const [currentSymbol, setCurrentSymbol] = useState<string | null>(null);
@@ -901,9 +914,12 @@ function App() {
 
   // Indentation Settings
   const [indentSettings, setIndentSettings] = useState<{ tabSize: number; insertSpaces: boolean }>(() => {
-    const saved = localStorage.getItem('codeforge-indent');
+    const saved = safeGet('codeforge-indent');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && Number.isFinite(parsed.tabSize) && typeof parsed.insertSpaces === 'boolean') return parsed;
+      } catch {}
     }
     return { tabSize: 2, insertSpaces: true };
   });
@@ -998,22 +1014,22 @@ function App() {
     setTerminal(prev => `${prev}\n✓ Replaced ${totalReplacements} occurrence(s) in ${filesUpdated} file(s)`);
   };
 
-  useEffect(() => localStorage.setItem('codeforge-files', JSON.stringify(files)), [files]);
-  useEffect(() => localStorage.setItem('codeforge-git', JSON.stringify(gitHistory)), [gitHistory]);
-  useEffect(() => localStorage.setItem('codeforge-extensions', JSON.stringify(extensions)), [extensions]);
-  useEffect(() => localStorage.setItem('codeforge-font', String(fontSize)), [fontSize]);
-  useEffect(() => localStorage.setItem('codeforge-theme', theme), [theme]);
-  useEffect(() => localStorage.setItem('codeforge-ai-provider', aiProvider), [aiProvider]);
-  useEffect(() => localStorage.setItem('codeforge-ai-key', aiApiKey), [aiApiKey]);
-  useEffect(() => localStorage.setItem('codeforge-ai-endpoint', aiCustomEndpoint), [aiCustomEndpoint]);
+  useEffect(() => { safeSet('codeforge-files', JSON.stringify(files)); }, [files]);
+  useEffect(() => { safeSet('codeforge-git', JSON.stringify(gitHistory)); }, [gitHistory]);
+  useEffect(() => { safeSet('codeforge-extensions', JSON.stringify(extensions)); }, [extensions]);
+  useEffect(() => { safeSet('codeforge-font', String(fontSize)); }, [fontSize]);
+  useEffect(() => { safeSet('codeforge-theme', theme); }, [theme]);
+  useEffect(() => { safeSet('codeforge-ai-provider', aiProvider); }, [aiProvider]);
+  useEffect(() => { safeSet('codeforge-ai-key', aiApiKey); }, [aiApiKey]);
+  useEffect(() => { safeSet('codeforge-ai-endpoint', aiCustomEndpoint); }, [aiCustomEndpoint]);
   useEffect(() => {
     try {
       sessionStorage.setItem('codeforge-gh-token', ghToken);
     } catch {}
   }, [ghToken]);
-  useEffect(() => localStorage.setItem('codeforge-gh-repo', ghRepoInput), [ghRepoInput]);
-  useEffect(() => localStorage.setItem('codeforge-sticky-scroll', String(stickyScroll)), [stickyScroll]);
-  useEffect(() => localStorage.setItem('codeforge-breadcrumbs', String(breadcrumbsEnabled)), [breadcrumbsEnabled]);
+  useEffect(() => { safeSet('codeforge-gh-repo', ghRepoInput); }, [ghRepoInput]);
+  useEffect(() => { safeSet('codeforge-sticky-scroll', String(stickyScroll)); }, [stickyScroll]);
+  useEffect(() => { safeSet('codeforge-breadcrumbs', String(breadcrumbsEnabled)); }, [breadcrumbsEnabled]);
 
   const detectSymbolAtLine = (content: string, language: string, targetLine: number): string | null => {
     if (!content) return null;
@@ -1609,7 +1625,7 @@ function App() {
   const applyIndentation = (tabSize: number, insertSpaces: boolean) => {
     const next = { tabSize, insertSpaces };
     setIndentSettings(next);
-    localStorage.setItem('codeforge-indent', JSON.stringify(next));
+    safeSet('codeforge-indent', JSON.stringify(next));
     if (editorRef.current) {
       const model = editorRef.current.getModel();
       if (model) {
@@ -1976,7 +1992,7 @@ if 'matplotlib.pyplot' in sys.modules:
       setPanel(true);
       try {
         const parsed = JSON.parse(liveCode);
-        setTerminal(prev => `${prev}\n$ validate ${active.name}\n✓ Valid JSON (${Object.keys(parsed).length} keys)\n${JSON.stringify(parsed, null, 2)}`);
+        setTerminal(prev => `${prev}\n$ validate ${active.name}\n✓ Valid JSON (${parsed !== null && typeof parsed === 'object' ? Object.keys(parsed).length : 0} keys)\n${JSON.stringify(parsed, null, 2)}`);
       } catch (e: any) {
         setTerminal(prev => `${prev}\n$ validate ${active.name}\n🔴 Invalid JSON: ${e.message}`);
       }

@@ -17,9 +17,9 @@ import {
   Zap,
   Flame,
   Users,
-  Check
-} from 'lucide-react';
+  Check, Film, Image as ImageIcon } from 'lucide-react';
 import { saveFile } from '../utils/saveFile';
+import { encodeGif } from '../utils/gifEncoder';
 
 export interface Joint {
   x: number;
@@ -594,53 +594,53 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
     []
   );
 
-  // Redraw canvas
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
+  // Draws one frame into any 2D context (used by the live canvas and by video/GIF export)
+  const renderScene = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      w: number,
+      h: number,
+      frame: AnimeFrame | undefined,
+      ghostFrame?: AnimeFrame,
+      selectedId?: string
+    ) => {
     // Clear background
     ctx.fillStyle = '#0b0f17';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, w, h);
 
     // Grid Floor / Anime Arena Floor
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 1;
-    const floorY = canvas.height - 50;
+    const floorY = h - 50;
 
     // Grid Perspective
-    for (let x = 0; x <= canvas.width; x += 40) {
+    for (let x = 0; x <= w; x += 40) {
       ctx.beginPath();
       ctx.moveTo(x, floorY);
-      ctx.lineTo(x, canvas.height);
+      ctx.lineTo(x, h);
       ctx.stroke();
     }
     ctx.beginPath();
     ctx.moveTo(0, floorY);
-    ctx.lineTo(canvas.width, floorY);
+    ctx.lineTo(w, floorY);
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Draw Onion Skin (Previous Frame)
-    if (onionSkin && currentFrameIdx > 0 && !isPlaying) {
-      const prevFrame = frames[currentFrameIdx - 1];
-      if (prevFrame) {
-        prevFrame.characters.forEach(char => drawStickFigure(ctx, char, true));
-      }
+    if (ghostFrame) {
+      ghostFrame.characters.forEach(char => drawStickFigure(ctx, char, true));
     }
 
     // Draw Current Frame Characters
-    if (currentFrame) {
-      currentFrame.characters.forEach(char => {
-        const isSelected = char.id === selectedCharId;
+    if (frame) {
+      frame.characters.forEach(char => {
+        const isSelected = char.id === selectedId;
         drawStickFigure(ctx, char, false, isSelected);
       });
 
       // Draw effects
-      currentFrame.effects.forEach(ef => {
+      frame.effects.forEach(ef => {
         ctx.save();
         if (ef.type === 'slash') {
           ctx.strokeStyle = ef.color;
@@ -667,7 +667,19 @@ export const StykAnimeStudio: React.FC<StykAnimeStudioProps> = ({ onClose, onExp
         ctx.restore();
       });
     }
-  }, [frames, currentFrameIdx, onionSkin, isPlaying, selectedCharId, drawStickFigure, currentFrame]);
+    },
+    [drawStickFigure]
+  );
+
+  // Redraw canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const ghost = onionSkin && currentFrameIdx > 0 && !isPlaying ? frames[currentFrameIdx - 1] : undefined;
+    renderScene(ctx, canvas.width, canvas.height, currentFrame, ghost, selectedCharId);
+  }, [frames, currentFrameIdx, onionSkin, isPlaying, selectedCharId, renderScene, currentFrame]);
 
   // Pointer drag handling (Touch & Mouse)
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -1124,6 +1136,115 @@ requestAnimationFrame(loop);
   };
 
   // Download JSON
+  // ---- Video / GIF export -------------------------------------------------
+  const [exportBusy, setExportBusy] = useState<null | 'video' | 'gif'>(null);
+  const [exportStatus, setExportStatus] = useState('');
+  const pause = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+  const finishExport = (message: string) => {
+    setExportStatus(message);
+    setExportBusy(null);
+    setTimeout(() => setExportStatus(''), 7000);
+  };
+
+  const exportVideo = async () => {
+    if (exportBusy || frames.length === 0) return;
+    const Recorder = (window as any).MediaRecorder;
+    const probe = document.createElement('canvas') as any;
+    if (!Recorder || typeof probe.captureStream !== 'function') {
+      finishExport('✗ Video recording is not supported on this device. Use GIF instead.');
+      return;
+    }
+    const mime = [
+      'video/mp4;codecs=avc1.42E01E',
+      'video/mp4',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm'
+    ].find(t => Recorder.isTypeSupported && Recorder.isTypeSupported(t));
+    if (!mime) {
+      finishExport('✗ No supported video format on this device. Use GIF instead.');
+      return;
+    }
+
+    setIsPlaying(false);
+    setExportBusy('video');
+    try {
+      const canvas = document.createElement('canvas') as any;
+      canvas.width = 640;
+      canvas.height = 380;
+      const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+      renderScene(ctx, 640, 380, frames[0]);
+      const stream = canvas.captureStream();
+      const recorder = new Recorder(stream, { mimeType: mime, videoBitsPerSecond: 4000000 });
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (e: any) => {
+        if (e.data && e.data.size) chunks.push(e.data);
+      };
+      const stopped = new Promise<void>(resolve => {
+        recorder.onstop = () => resolve();
+      });
+
+      recorder.start();
+      const frameMs = 1000 / fps;
+      // Very short animations are looped so the clip lasts at least ~3 seconds
+      const loops = Math.max(1, Math.ceil(3000 / (frames.length * frameMs)));
+      const totalFrames = loops * frames.length;
+      let done = 0;
+      for (let l = 0; l < loops; l++) {
+        for (let i = 0; i < frames.length; i++) {
+          renderScene(ctx, 640, 380, frames[i]);
+          done++;
+          setExportStatus(`Recording video… ${Math.round((done / totalFrames) * 100)}%`);
+          await pause(frameMs);
+        }
+      }
+      await pause(frameMs);
+      recorder.stop();
+      await stopped;
+      stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+
+      const type = mime.split(';')[0];
+      const ext = type === 'video/mp4' ? 'mp4' : 'webm';
+      const blob = new Blob(chunks, { type });
+      await saveFile(blob, `stykanime-animation-${Date.now()}.${ext}`, type);
+      finishExport(`✓ Video ready (${ext.toUpperCase()})`);
+    } catch {
+      finishExport('✗ Video export failed. Try GIF instead.');
+    }
+  };
+
+  const exportGif = async () => {
+    if (exportBusy || frames.length === 0) return;
+    setIsPlaying(false);
+    setExportBusy('gif');
+    setExportStatus('Building GIF… 0%');
+    try {
+      const scale = 0.75; // smaller file, still sharp
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(640 * scale);
+      canvas.height = Math.round(380 * scale);
+      const ctx = canvas.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
+      const images: ImageData[] = [];
+      for (let i = 0; i < frames.length; i++) {
+        ctx.save();
+        ctx.scale(scale, scale);
+        renderScene(ctx, 640, 380, frames[i]);
+        ctx.restore();
+        images.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        setExportStatus(`Building GIF… ${Math.round(((i + 1) / frames.length) * 40)}%`);
+        await pause(0);
+      }
+      const bytes = await encodeGif(images, canvas.width, canvas.height, fps, ratio =>
+        setExportStatus(`Building GIF… ${40 + Math.round(ratio * 60)}%`)
+      );
+      const blob = new Blob([bytes as BlobPart], { type: 'image/gif' });
+      await saveFile(blob, `stykanime-animation-${Date.now()}.gif`, 'image/gif');
+      finishExport(`✓ GIF ready (${Math.max(1, Math.round(blob.size / 1024))} KB)`);
+    } catch {
+      finishExport('✗ GIF export failed.');
+    }
+  };
+
   const downloadJSON = () => {
     saveFile(JSON.stringify(frames, null, 2), `stykanime-animation-${Date.now()}.json`, 'application/json');
   };
@@ -1151,6 +1272,24 @@ requestAnimationFrame(loop);
             {exportedNotify ? <Check size={14} /> : <Code2 size={14} />}
             <span>{exportedNotify ? 'Exported!' : 'Export to Code'}</span>
           </button>
+          <button
+            className="stykanime-top-btn secondary"
+            onClick={exportVideo}
+            disabled={!!exportBusy}
+            title="Export as video (MP4/WebM)"
+          >
+            <Film size={14} />
+            <span className="stykanime-btn-label">Video</span>
+          </button>
+          <button
+            className="stykanime-top-btn secondary"
+            onClick={exportGif}
+            disabled={!!exportBusy}
+            title="Export as animated GIF"
+          >
+            <ImageIcon size={14} />
+            <span className="stykanime-btn-label">GIF</span>
+          </button>
           <button className="stykanime-top-btn secondary" onClick={downloadJSON} title="Download JSON Project">
             <Download size={14} />
           </button>
@@ -1159,6 +1298,12 @@ requestAnimationFrame(loop);
           </button>
         </div>
       </header>
+
+      {exportStatus && (
+        <div className="stykanime-export-status" role="status">
+          {exportStatus}
+        </div>
+      )}
 
       {/* Main Studio Body */}
       <div className="stykanime-body">

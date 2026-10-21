@@ -5126,3 +5126,18 @@ a.tile-btn {
     display: none;
   }
 }
+
+
+/* StykAnime video / GIF export */
+.stykanime-top-btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+.stykanime-export-status {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.08);
+  border-bottom: 1px solid rgba(250, 204, 21, 0.25);
+}

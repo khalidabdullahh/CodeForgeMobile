@@ -8,3 +8,8 @@ dist/
 *.zip
 .idea/
 build-output/
+
+# Android signing keys must never be committed
+*.keystore
+*.jks
+KEYSTORE-INFO.txt

@@ -4,6 +4,8 @@ import JSZip from 'jszip';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { saveFile } from './utils/saveFile';
+import { runNative, needsInput, type NativeLang } from './utils/remoteRunner';
+import { runShell, type ShellAction, type ShellHost, type ShellSession } from './utils/shell';
 
 // Resilient fallback for ESM/CJS interop so Editor & DiffEditor are always valid React components
 const Editor: any = (MonacoEditorRaw as any)?.default || MonacoEditorNamed || MonacoEditorRaw;
@@ -784,7 +786,7 @@ function App() {
   const terminalOutputRef = useRef<HTMLPreElement>(null);
   const [search, setSearch] = useState('');
   const [contentSearch, setContentSearch] = useState('');
-  const [terminal, setTerminal] = useState('CodeForge Terminal\n$ workspace ready\n$ Type help for commands.');
+  const [terminal, setTerminal] = useState('CodeForge Terminal\nType help to see the commands (files, pipes, python, node, g++, javac, git...).');
   const [command, setCommand] = useState('');
   const [view, setView] = useState<View>('editor');
   const [extensions, setExtensions] = useState<Extension[]>(() => {
@@ -1958,6 +1960,47 @@ if 'matplotlib.pyplot' in sys.modules:
     }
   };
 
+  const termPrint = (text: string) => setTerminal(prev => `${prev}\n${text}`);
+
+  // Compile & run C / C++ / Java on a real remote compiler (needs internet)
+  const runNativeProgram = async (
+    lang: NativeLang,
+    source: string,
+    opts: { compileOnly?: boolean; stdin?: string; hasStdin?: boolean }
+  ): Promise<number> => {
+    let stdin = opts.stdin ?? '';
+    if (!opts.compileOnly && !opts.hasStdin && needsInput(lang, source)) {
+      const typed = window.prompt('Program input (stdin). Type \\n between lines, or leave empty for none:', '');
+      if (typed === null) {
+        termPrint('✗ Cancelled');
+        return 1;
+      }
+      stdin = typed.replace(/\\n/g, '\n') + (typed ? '\n' : '');
+      if (typed) termPrint(`⌨️ Input: ${typed}`);
+    }
+    termPrint(`⏳ ${opts.compileOnly ? 'Compiling' : 'Compiling and running'} on a remote compiler (needs internet)...`);
+    try {
+      const r = await runNative({ lang, source, stdin });
+      if (r.note) termPrint(`ℹ️ ${r.note}`);
+      if (r.compileError) {
+        termPrint(`🔴 Compilation failed:\n${r.compileError.trimEnd()}`);
+        return 1;
+      }
+      if (opts.compileOnly) {
+        termPrint('✓ Compiled successfully');
+        return 0;
+      }
+      if (r.stdout) termPrint(r.stdout.replace(/\n$/, ''));
+      if (r.stderr) termPrint(`🔴 ${r.stderr.trimEnd()}`);
+      const code = r.exitCode ?? (r.ok ? 0 : 1);
+      termPrint(`${code === 0 ? '✓' : '🔴'} Process exited with code ${code} (${r.provider}${r.timeSec !== undefined ? `, ${r.timeSec}s` : ''})`);
+      return code;
+    } catch (e: any) {
+      termPrint(`🔴 ${e && e.message ? e.message : String(e)}`);
+      return 1;
+    }
+  };
+
   const handleRunCurrentCode = () => {
     if (!active) return;
     const lang = active.language || languageFor(active.name);
@@ -1979,38 +2022,19 @@ if 'matplotlib.pyplot' in sys.modules:
       setView('preview');
       setPreviewKey(k => k + 1);
       setTerminal(prev => `${prev}\n✓ Stylesheet applied to Live Preview`);
-    } else if (lang === 'c' || lang === 'cpp' || name.endsWith('.c') || name.endsWith('.cpp')) {
+    } else if (lang === 'c' || lang === 'cpp' || name.endsWith('.c') || name.endsWith('.cpp') || name.endsWith('.cc')) {
+      const nativeLang: NativeLang = lang === 'c' || name.endsWith('.c') ? 'c' : 'cpp';
+      const base = active.name.replace(/\.[^.]+$/, '');
       setPanel(true);
-      const base = active.name.split('.')[0];
-      setTerminal(prev => `${prev}\n$ g++ ${active.name} -o ${base}\n$ ./${base}\n⏳ Compiling ${active.name}...`);
-      setTimeout(() => {
-        const printMatches = liveCode.match(/(?:printf\s*\(\s*"(.*?)"|cout\s*<<\s*"(.*?)")/g);
-        if (printMatches && printMatches.length) {
-          printMatches.forEach((m: string) => {
-            const clean = m.replace(/printf\s*\(\s*"|"|\)|cout\s*<<\s*|<<\s*endl|;/g, '').replace(/\\n/g, '');
-            if (clean) setTerminal(prev => `${prev}\n${clean}`);
-          });
-        } else {
-          setTerminal(prev => `${prev}\nHello from ${active.name}!`);
-        }
-        setTerminal(prev => `${prev}\n✓ Process returned 0 (0x0)`);
-      }, 200);
+      setPanelTab('terminal');
+      termPrint(`$ ${nativeLang === 'c' ? 'gcc' : 'g++'} ${active.name} -o ${base} && ./${base}`);
+      runNativeProgram(nativeLang, liveCode, {});
     } else if (lang === 'java' || name.endsWith('.java')) {
+      const base = active.name.replace(/\.java$/i, '');
       setPanel(true);
-      const base = active.name.replace('.java', '');
-      setTerminal(prev => `${prev}\n$ javac ${active.name}\n$ java ${base}\n⏳ Compiling Java source...`);
-      setTimeout(() => {
-        const sysout = liveCode.match(/System\.out\.println\s*\(\s*"(.*?)"\s*\)/g);
-        if (sysout && sysout.length) {
-          sysout.forEach((s: string) => {
-            const str = s.replace(/System\.out\.println\s*\(\s*"|"\s*\)/g, '');
-            setTerminal(prev => `${prev}\n${str}`);
-          });
-        } else {
-          setTerminal(prev => `${prev}\nHello from ${active.name}!`);
-        }
-        setTerminal(prev => `${prev}\n✓ Execution completed.`);
-      }, 200);
+      setPanelTab('terminal');
+      termPrint(`$ javac ${active.name} && java ${base}`);
+      runNativeProgram('java', liveCode, {});
     } else if (lang === 'json' || name.endsWith('.json')) {
       setPanel(true);
       try {
@@ -2073,51 +2097,122 @@ if 'matplotlib.pyplot' in sys.modules:
     }
   }, [terminal, panelTab]);
 
-  const runCommand = (cmd: string) => {
+  // ---- Terminal: a real shell over the project files (see utils/shell.ts)
+  const shellSessionRef = useRef<ShellSession>({ cwd: '', binaries: {}, lastCode: 0 });
+  const [shellCwd, setShellCwd] = useState('');
+  const [shellBusy, setShellBusy] = useState(false);
+
+  const runCommand = async (cmd: string) => {
     const clean = cmd.trim();
-    if (!clean) return;
+    if (!clean || shellBusy) return;
     setCmdHistory(prev => [clean, ...prev.filter(x => x !== clean)]);
     setHistoryIdx(-1);
-    const lower = clean.toLowerCase();
-    if (lower === 'help') setTerminal(prev => `${prev}\n$ ${clean}\nCommands: help, ls, tree, pwd, cat <file>, python <file>, npm run dev, npm test, clear`);
-    else if (lower === 'ls') setTerminal(prev => `${prev}\n$ ls\n${files.map(f => f.name).join('  ')}`);
-    else if (lower === 'tree') setTerminal(prev => `${prev}\n$ tree\n${files.map(f => `├── ${f.path}`).join('\n')}`);
-    else if (lower === 'pwd') setTerminal(prev => `${prev}\n$ pwd\n/codeforge/workspace`);
-    else if (lower.startsWith('python ') || lower.startsWith('py ')) {
-      const parts = clean.split(/\s+/);
-      const targetName = parts[1];
-      let target = active;
-      if (targetName) {
-        const found = files.find(f => f.name.toLowerCase() === targetName.toLowerCase() || f.path.toLowerCase() === targetName.toLowerCase());
-        if (!found) {
-          setTerminal(prev => `${prev}\n$ ${clean}\npython: can't open file '${targetName}': No such file`);
-          setCommand('');
-          setPanel(true);
-          return;
-        }
-        target = found;
-      } else {
-        target = files.find(f => f.language === 'python' || f.name.endsWith('.py')) || active;
-      }
-      runPythonCode(target.content);
-    } else if (lower.startsWith('cat ')) {
-      const name = clean.slice(4).trim();
-      const target = files.find(f => f.name === name || f.path === name);
-      setTerminal(prev => `${prev}\n$ ${clean}\n${target ? target.content : `cat: ${name}: No such file`}`);
-    } else if (lower === 'git status') setTerminal(prev => `${prev}\n$ git status\nOn branch ${branch}\n${files.some(f => f.modified) ? 'Changes not staged for commit' : 'working tree clean'}`);
-    else if (lower === 'git log') setTerminal(prev => `${prev}\n$ git log\n${gitHistory.map((x, i) => `commit ${String(i + 1).padStart(7, '0')}  ${x}`).join('\n')}`);
-    else if (lower === 'git branch') setTerminal(prev => `${prev}\n$ git branch\n* ${branch}\n  dev\n  feature/mobile`);
-    else if (lower === 'npm run dev') {
-      setTerminal(prev => `${prev}\n$ npm run dev\n✓ Runtime started at codeforge://localhost:5173`);
-      setView('preview');
-      setPreviewKey(k => k + 1);
-    } else if (lower === 'npm test') {
-      setDiagnostics('Test runner: 3 checks passed.');
-      setTerminal(prev => `${prev}\n$ npm test\n✓ 3 checks passed`);
-    } else if (lower === 'clear') setTerminal('CodeForge Terminal\n$ cleared');
-    else setTerminal(prev => `${prev}\n$ ${clean}\nCodeForge runtime: command accepted.`);
     setCommand('');
     setPanel(true);
+    setPanelTab('terminal');
+    setShellBusy(true);
+    termPrint(`${shellSessionRef.current.cwd ? '~/' + shellSessionRef.current.cwd : '~'} $ ${clean}`);
+
+    const startFiles = files;
+    const inputMap = new Map<string, string>(startFiles.map(f => [f.path, f.content] as [string, string]));
+    const snapshots: Record<string, string> = {};
+    startFiles.forEach(f => {
+      if (savedSnapshots[f.id] !== undefined) snapshots[f.path] = savedSnapshots[f.id];
+    });
+    const deferred: (() => void)[] = [];
+    let openPath: string | null = null;
+
+    const host: ShellHost = {
+      print: termPrint,
+      run: async (a: ShellAction) => {
+        switch (a.type) {
+          case 'clear':
+            setTerminal('CodeForge Terminal');
+            return 0;
+          case 'preview':
+            deferred.push(() => {
+              setView('preview');
+              setPreviewKey(k => k + 1);
+            });
+            return 0;
+          case 'open':
+            openPath = a.path;
+            return 0;
+          case 'run-python':
+            await runPythonCode(a.content, a.name);
+            return 0;
+          case 'run-node':
+            runJavaScriptCode(a.content, a.name);
+            return 0;
+          case 'native-compile':
+            return runNativeProgram(a.lang, a.content, { compileOnly: true });
+          case 'native-run':
+            return runNativeProgram(a.lang, a.content, { stdin: a.stdin, hasStdin: a.hasStdin });
+          case 'git-commit':
+            deferred.push(() => commitWithMessage(a.message));
+            return 0;
+          case 'git-branch':
+            setBranch(a.name);
+            termPrint(`✓ Switched to branch '${a.name}' (branch names are labels in this workspace; history is shared)`);
+            return 0;
+          default:
+            return 1;
+        }
+      }
+    };
+
+    try {
+      const result = await runShell(
+        clean,
+        {
+          files: inputMap,
+          session: shellSessionRef.current,
+          git: { branch, modified: startFiles.filter(f => f.modified).map(f => f.path), log: gitHistory, snapshots },
+          history: cmdHistory
+        },
+        host
+      );
+      setShellCwd(shellSessionRef.current.cwd);
+
+      // Apply only what the command changed, on top of the latest state
+      const baseName = (p: string) => p.slice(p.lastIndexOf('/') + 1);
+      const moved = new Map(result.moves);
+      const removedPaths = [...inputMap.keys()].filter(p => !result.files.has(p) && !moved.has(p));
+      const removedIds = startFiles.filter(f => removedPaths.includes(f.path)).map(f => f.id);
+      const created: FileItem[] = [];
+      for (const [path, content] of result.files) {
+        const isMoveTarget = [...moved.values()].includes(path);
+        if (!inputMap.has(path) && !isMoveTarget) {
+          created.push({ id: crypto.randomUUID(), name: baseName(path), path, language: languageFor(baseName(path)), content, modified: true });
+        }
+      }
+      const changed = new Map<string, string>();
+      for (const [path, content] of result.files) {
+        if (inputMap.has(path) && inputMap.get(path) !== content) changed.set(path, content);
+      }
+      if (result.moves.length || removedPaths.length || created.length || changed.size) {
+        setFiles(prev => {
+          let next = prev.slice();
+          for (const [from, to] of result.moves) {
+            next = next.filter(f => f.path !== to);
+            next = next.map(f => (f.path === from ? { ...f, path: to, name: baseName(to), language: languageFor(baseName(to)) } : f));
+          }
+          next = next.filter(f => !removedPaths.includes(f.path));
+          next = next.map(f => (changed.has(f.path) ? { ...f, content: changed.get(f.path) as string, modified: true } : f));
+          return [...next, ...created];
+        });
+        removedIds.forEach(id => closeTab(id));
+      }
+      const target = openPath
+        ? created.find(f => f.path === openPath) || startFiles.find(f => f.path === (moved.get(openPath as string) ?? openPath))
+        : null;
+      if (target) openFile(target.id);
+      deferred.forEach(fn => fn());
+    } catch (e: any) {
+      termPrint(`🔴 terminal error: ${e && e.message ? e.message : String(e)}`);
+    } finally {
+      setShellBusy(false);
+    }
   };
 
   const discardFileChanges = (fileId: string) => {
@@ -2135,8 +2230,8 @@ if 'matplotlib.pyplot' in sys.modules:
     setTerminal(prev => `${prev}\n✓ Discarded all uncommitted changes in workspace`);
   };
 
-  const commit = () => {
-    const message = gitMessage.trim();
+  const commitWithMessage = (rawMessage: string) => {
+    const message = rawMessage.trim();
     if (!message) return;
     setGitHistory(prev => [message, ...prev]);
     setSavedSnapshots(prev => {
@@ -2146,6 +2241,10 @@ if 'matplotlib.pyplot' in sys.modules:
     });
     setFiles(prev => prev.map(f => ({ ...f, modified: false })));
     setTerminal(prev => `${prev}\n✓ [${branch}] committed: ${message}`);
+  };
+
+  const commit = () => {
+    commitWithMessage(gitMessage);
     setGitMessage('');
   };
 
@@ -5260,8 +5359,7 @@ if 'matplotlib.pyplot' in sys.modules:
                       className="term-tool-btn highlight"
                       title={`Run ${active?.name}`}
                       onClick={() => {
-                        if (active?.name.endsWith('.py')) runCommand(`python ${active.name}`);
-                        else runCommand('npm run dev');
+                        if (active) runCommand(`run "${active.path}"`);
                       }}
                     >
                       run {active?.name?.split('.').pop() || 'code'}
@@ -5309,7 +5407,7 @@ if 'matplotlib.pyplot' in sys.modules:
                       runCommand(command);
                     }}
                   >
-                    <span>$</span>
+                    <span>{shellCwd ? `~/${shellCwd} $` : '~ $'}</span>
                     <input
                       value={command}
                       onChange={e => setCommand(e.target.value)}
@@ -5322,7 +5420,7 @@ if 'matplotlib.pyplot' in sys.modules:
                           handleHistoryDown();
                         }
                       }}
-                      placeholder="help, ls, python main.py, npm run dev..."
+                      placeholder="help, ls, cd, cat, grep, python x.py, g++ x.cpp -o x && ./x"
                       autoCapitalize="off"
                       autoCorrect="off"
                     />

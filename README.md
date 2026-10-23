@@ -9,7 +9,7 @@
 [![Try Web IDE](https://img.shields.io/badge/🚀_LAUNCH_WEB_IDE-codeforgemobile.pages.dev-2563eb?style=for-the-badge&logo=googlechrome&logoColor=white)](https://codeforgemobile.pages.dev)
 [![Install App](https://img.shields.io/badge/📱_INSTALL_APP_(APK)-1--Click_Install-10b981?style=for-the-badge&logo=android&logoColor=white)](https://codeforgemobile.pages.dev)
 [![GitHub Stars](https://img.shields.io/github/stars/khalidabdullahh/CodeForgeMobile?style=for-the-badge&color=f59e0b&logo=github)](https://github.com/khalidabdullahh/CodeForgeMobile)
-[![License](https://img.shields.io/badge/License-Proprietary%20%2F%20Source--Available-red?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/License-Source--Available-blue?style=for-the-badge)](LICENSE)
 
 <br />
 
@@ -166,12 +166,19 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) fo
 
 ---
 
-## 📄 License & Proprietary Rights
+## 📄 License
 
-This project is source-available and governed by a **Custom Proprietary & Community Contribution License** - see the [LICENSE](LICENSE) file for complete details.
+CodeForge Mobile is **free to use and source-available**, released under the [CodeForge Mobile Source-Available License](LICENSE). It is *not* an OSI-approved open-source license.
 
-- **Intellectual Property & Exclusive Ownership:** All software, design, and branding rights are exclusively reserved by **Khalid Abdullah**.
-- **Community Contributions:** Contributions via Pull Requests are welcomed under our contributor grant terms (see [CONTRIBUTING.md](CONTRIBUTING.md)).
-- **Commercial Restrictions:** Commercial redistribution, reselling, sublicensing, or re-branding without prior written consent from Khalid Abdullah is strictly prohibited.
+| ✅ You can | ❌ You can't |
+|---|---|
+| Use the app for anything, including your own commercial projects | Publish or host a copy (or modified copy) as your own app, free or paid, under any name |
+| Read, study and learn from the code | Claim you wrote it, or remove credits and the license |
+| Fork privately to learn, test or prepare a pull request | Copy substantial code into another product |
+| Contribute fixes and features via Pull Requests | Sell it, or use the name and logo to suggest you are the original |
+
+Want to do something not listed here? Just ask first: [github.com/khalidabdullahh](https://github.com/khalidabdullahh).
+
+Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Copyright (c) 2026 **Khalid Abdullah**. All rights reserved.

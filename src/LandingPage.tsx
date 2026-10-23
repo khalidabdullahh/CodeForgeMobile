@@ -447,7 +447,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <header className="hero-section">
         <div className="hero-badge anim-fade-up">
           <Sparkles size={14} className="text-yellow-400" />
-          <span>Android-First VS Code-Inspired Mobile IDE · 100% Free & Open Source</span>
+          <span>Android-First VS Code-Inspired Mobile IDE · 100% Free · Source-Available</span>
         </div>
 
         <h1 className="hero-title anim-fade-up delay-1">
@@ -782,7 +782,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Open Source Community Section */}
+      {/* Community Section */}
       <section id="community" className="support-section reveal-on-scroll">
         <div className="coffee-container">
           <div
@@ -791,10 +791,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           >
             <Github size={36} className="text-blue-400" />
           </div>
-          <h2>Join the Open Source Community</h2>
+          <h2>Join the Community</h2>
           <p>
-            CodeForge Mobile is 100% free and open-source created by <strong>Khalid Abdullah</strong>.
-            Contribute features, report issues, or star the project on GitHub to help us grow!
+            CodeForge Mobile is 100% free to use and its source code is public, created by{' '}
+            <strong>Khalid Abdullah</strong>. Learn from the code, contribute features, report issues, or star the
+            project on GitHub to help it grow!
           </p>
 
           <div className="flex gap-3 justify-center flex-wrap">
@@ -837,7 +838,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               target="_blank"
               rel="noreferrer"
             >
-              License (Proprietary)
+              License
             </a>
             <a href="https://codeforgemobile.pages.dev" target="_blank" rel="noreferrer">
               Live Website

@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to **CodeForge Mobile**! 🎉
 
-CodeForge Mobile is an Android-first, VS Code-inspired mobile and web IDE designed, engineered, and exclusively owned by **Khalid Abdullah**. While the project is source-available and protected against commercial duplication, community contributions such as bug fixes, mobile usability improvements, editor enhancements, animations, and documentation are warmly welcomed.
+CodeForge Mobile is an Android-first, VS Code-inspired mobile and web IDE designed, engineered, and exclusively owned by **Khalid Abdullah**. While the project is source-available (free to use and learn from, but not to copy and republish), community contributions such as bug fixes, mobile usability improvements, editor enhancements, animations, and documentation are warmly welcomed.
 
 ---
 

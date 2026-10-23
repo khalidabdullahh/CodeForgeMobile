@@ -1,36 +1,63 @@
-PROPRIETARY & SOURCE-AVAILABLE LICENSE
+CODEFORGE MOBILE SOURCE-AVAILABLE LICENSE (v1.0)
 
-Copyright (c) 2026 Khalid Abdullah. All Rights Reserved.
+Copyright (c) 2026 Khalid Abdullah. All rights reserved.
 
-NOTICE: All software, source code, designs, algorithms, user interfaces, and documentation 
-contained in this repository are the exclusive intellectual property of Khalid Abdullah.
+CodeForge Mobile ("the Software") includes its source code, design, user interface,
+name, logo and documentation. Khalid Abdullah ("the Author") is the sole owner of
+the Software.
 
-GRANT OF RIGHTS:
-1. Viewing, inspecting, and educational review of the source code through GitHub is permitted.
-2. Creating local forks and clones strictly for personal testing, evaluation, learning, or 
-   contributing back to this upstream repository is permitted.
+In short: use the app, read the code, learn from it and contribute back, all freely.
+Do not copy it and publish it as your own, and do not sell it.
 
-COMMUNITY CONTRIBUTIONS:
-Anyone is welcome to submit bug fixes, feature enhancements, documentation, or improvements 
-via GitHub Pull Requests. By submitting any contribution (including pull requests, code patches, 
-assets, or documentation) to this repository, you explicitly and irrevocably agree that:
-- Your submission is your original work or you have the full authority to submit it.
-- You grant Khalid Abdullah an irrevocable, perpetual, worldwide, non-exclusive, transferable, 
-  royalty-free license to merge, adapt, modify, compile, distribute, publish, and license 
-  the contribution as part of CodeForge Mobile or any related project.
-- Khalid Abdullah remains the sole owner, copyright holder, and intellectual property 
-  proprietor of the entire CodeForge Mobile project.
+1. WHAT YOU MAY DO (free of charge)
+   a. Use the app (web, PWA or Android) for any purpose, including personal, school,
+      work and commercial projects you build with it. Everything you write or create
+      inside the app belongs to you.
+   b. Read, study and run the source code to learn how it works.
+   c. Create a private fork or clone for testing, evaluation, learning, or to prepare
+      a contribution to this repository.
+   d. Reuse general ideas, techniques and knowledge you gain from reading the code.
+   e. Quote short excerpts (for example in tutorials, reviews or questions) with credit
+      to "CodeForge Mobile by Khalid Abdullah" and a link to this repository.
 
-RESTRICTIONS (NO UNAUTHORIZED COMMERCIAL EXPLOITATION):
-1. Commercial reproduction, distribution, sublicensing, reselling, or hosting of this software, 
-   in whole or in part, or any derivative works is STRICTLY PROHIBITED without prior written 
-   permission from Khalid Abdullah.
-2. Re-branding, re-publishing, or claiming ownership of this project, its code, or its brand 
-   under any other name or entity is strictly forbidden and protected under international copyright law.
+2. WHAT YOU MAY NOT DO
+   a. Publish, host, distribute or upload the Software, or any modified version of it,
+      as your own app, website, package or store listing, whether free or paid, and
+      whether under the original name or any other name.
+   b. Claim, imply or advertise that you wrote or own the Software or any substantial
+      part of it.
+   c. Remove or change copyright notices, author credits or this license.
+   d. Copy substantial portions of the source code into another product or project.
+   e. Sell, rent, sublicense or otherwise commercialize the Software or derivatives
+      of it, or offer it as part of a paid product or service.
+   f. Use the name "CodeForge Mobile", "StykAnime", or the logo and branding in a way
+      that suggests your project is the original or is endorsed by the Author.
 
-DISCLAIMER OF WARRANTY:
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
-PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY 
-CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, 
-ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+3. PERMISSION FOR ANYTHING ELSE
+   For any use not listed in section 1, including publishing a version, commercial use
+   or redistribution, ask the Author first and get written permission.
+
+4. COMMUNITY CONTRIBUTIONS
+   Pull requests, patches, issues and ideas are welcome. By submitting a contribution
+   you confirm it is your own work (or you have the right to submit it) and you grant
+   the Author a perpetual, worldwide, irrevocable, royalty-free license to use, modify,
+   publish and relicense it as part of CodeForge Mobile or related projects. The Author
+   remains the sole owner of the project as a whole. Contributors are credited in the
+   repository history and release notes.
+
+5. THIRD-PARTY COMPONENTS
+   The Software uses third-party open-source libraries (for example React, Monaco Editor,
+   Pyodide and Capacitor). They remain under their own licenses, which are not changed
+   by this license.
+
+6. TERMINATION
+   If you break this license your permissions end automatically. You may get them back
+   by stopping the violation and receiving the Author's written approval.
+
+7. DISCLAIMER OF WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+   INCLUDING BUT NOT LIMITED TO MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR
+   OTHER LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+Contact: https://github.com/khalidabdullahh  |  https://khalidslab.pages.dev

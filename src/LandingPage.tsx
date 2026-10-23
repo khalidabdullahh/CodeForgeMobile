@@ -403,7 +403,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="nav-content">
           <div className="nav-brand">
             <div className="nav-logo">
-              <Code2 size={20} />
+              <img src="./icon-192.png" alt="CodeForge logo" width={34} height={34} />
             </div>
             <span className="brand-name">
               CodeForge <span className="brand-sub">Mobile</span>
@@ -789,7 +789,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <footer className="landing-footer">
         <div className="footer-content">
           <div className="footer-brand">
-            <Code2 size={18} />
+            <img src="./icon-192.png" alt="" width={22} height={22} className="footer-logo" />
             <span>CodeForge Mobile</span>
           </div>
           <p>© 2026 Khalid Abdullah. All Rights Reserved. Source-Available.</p>

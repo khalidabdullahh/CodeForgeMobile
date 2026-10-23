@@ -3401,7 +3401,7 @@ if 'matplotlib.pyplot' in sys.modules:
           </button>
           <div className="brand">
             <div className="brand-mark">
-              <Code2 size={18} />
+              <img src="./icon-192.png" alt="CodeForge logo" width={30} height={30} />
             </div>
             <span>CodeForge</span>
             <small>Mobile IDE</small>
@@ -4376,27 +4376,12 @@ if 'matplotlib.pyplot' in sys.modules:
             ) : (
             <div className="editor-wrap">
               <div className="editor-head">
-                <span>
+                <span className="editor-head-path" title={active?.path}>
                   {active?.path || 'No file selected'} {active?.modified ? '• unsaved' : ''}
                 </span>
-                <div className="editor-controls">
-                  <button
-                    className="pill-btn highlight-run-pill"
-                    title={`Run ${active?.name || 'File'}`}
-                    onClick={handleRunCurrentCode}
-                  >
-                    <Play size={12} /> Run {active?.name || 'File'}
-                  </button>
-                  <button className="pill-btn" title="Format code" onClick={formatFile}>
-                    <Wand2 size={13} /> Format
-                  </button>
-                  <button className="pill-btn" title="Split preview" onClick={() => setSplitPreview(v => !v)}>
-                    <Columns size={13} /> Split
-                  </button>
-                  <span>
-                    {active?.language || 'plaintext'} · {fontSize}px
-                  </span>
-                </div>
+                <span className="editor-head-meta">
+                  {active?.language || 'plaintext'} · {fontSize}px
+                </span>
               </div>
 
               {/* VS Code Breadcrumbs Bar */}

@@ -1,27 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  ArrowRight,
-  Bot,
-  ChevronUp,
-  Code2,
-  Columns,
-  Download,
-  ExternalLink,
-  Film,
-  FolderGit2,
-  Github,
-  Globe,
-  Keyboard,
-  Maximize2,
-  Palette,
-  Play,
-  Smartphone,
-  Sparkles,
-  Star,
-  Terminal,
-  X,
-  Zap
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowRight, ChevronUp, Download, ExternalLink, Github, Globe, Play, Star, X } from 'lucide-react';
+import '@fontsource-variable/cormorant-garamond/wght.css';
+import '@fontsource-variable/cormorant-garamond/wght-italic.css';
+import './landing.css';
 
 interface LandingPageProps {
   onLaunchIde: () => void;
@@ -29,17 +10,18 @@ interface LandingPageProps {
   onExportAndroid: () => void;
 }
 
-const TYPEWRITER_WORDS = ['Build', 'Create', 'Code', 'Deploy', 'Ship'];
-
+const REPO = 'https://github.com/khalidabdullahh/CodeForgeMobile';
 const GITHUB_REPO_API = 'https://api.github.com/repos/khalidabdullahh/CodeForgeMobile';
 const STARS_CACHE_KEY = 'codeforge-gh-stars';
 const STARS_CACHE_MS = 30 * 60 * 1000;
+const APK_URL = `${REPO}/releases/download/apk-latest/CodeForgeMobile.apk`;
+const RELEASES_URL = `${REPO}/releases`;
 
 function formatStars(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : String(n);
 }
 
-// Live GitHub star count (cached for 30 min to stay inside the unauthenticated API rate limit)
+// Live GitHub star count, cached for 30 minutes to stay inside the unauthenticated API rate limit
 function useGithubStars(): number | null {
   const [stars, setStars] = useState<number | null>(() => {
     try {
@@ -70,7 +52,7 @@ function useGithubStars(): number | null {
         }
       })
       .catch(() => {
-        /* offline or rate limited: keep cached value or show no count */
+        /* offline or rate limited: keep the cached value or show no count */
       });
     return () => {
       cancelled = true;
@@ -80,94 +62,111 @@ function useGithubStars(): number | null {
   return stars;
 }
 
-const APK_URL =
-  'https://github.com/khalidabdullahh/CodeForgeMobile/releases/download/apk-latest/CodeForgeMobile.apk';
-const RELEASES_URL = 'https://github.com/khalidabdullahh/CodeForgeMobile/releases';
+// ---- editor mockup content (code is shown in a monospace face on purpose)
+const t = (s: string) => `<span class="c-tag">${s}</span>`;
+const a = (s: string) => `<span class="c-attr">${s}</span>`;
+const q = (s: string) => `<span class="c-str">${s}</span>`;
+const sp = (n: number) => '&nbsp;'.repeat(n);
 
-const MOCK_SNIPPETS = [
+const SNIPPETS: { tab: string; lines: string[] }[] = [
   {
-    lang: 'HTML',
     tab: 'index.html',
     lines: [
-      { html: '<span class="c-tag">&lt;!doctype</span> <span class="c-attr">html</span>&gt;' },
-      { html: '&lt;<span class="c-tag">div</span> <span class="c-attr">class</span>=<span class="c-str">"codeforge-pocket-ide"</span>&gt;' },
-      { html: '&nbsp;&nbsp;&lt;<span class="c-tag">h1</span>&gt;Pocket-Sized VS Code 🚀&lt;/<span class="c-tag">h1</span>&gt;' },
-      { html: '&nbsp;&nbsp;&lt;<span class="c-tag">button</span> <span class="c-attr">onclick</span>=<span class="c-str">"runApp()"</span>&gt;Run&lt;/<span class="c-tag">button</span>&gt;' },
-      { html: '&lt;/<span class="c-tag">div</span>&gt;' }
+      `${t('&lt;!doctype')} ${a('html')}&gt;`,
+      `&lt;${t('main')} ${a('class')}=${q('"card"')}&gt;`,
+      `${sp(2)}&lt;${t('h1')}&gt;Hello from my phone&lt;/${t('h1')}&gt;`,
+      `${sp(2)}&lt;${t('button')} ${a('onclick')}=${q('"run()"')}&gt;Run&lt;/${t('button')}&gt;`,
+      `&lt;/${t('main')}&gt;`
     ]
   },
   {
-    lang: 'CSS',
-    tab: 'style.css',
-    lines: [
-      { html: '<span class="c-tag">.card</span> {' },
-      { html: '&nbsp;&nbsp;<span class="c-attr">background</span>: <span class="c-str">linear-gradient(135deg, #0f172a, #1e3a8a)</span>;' },
-      { html: '&nbsp;&nbsp;<span class="c-attr">border-radius</span>: <span class="c-str">16px</span>;' },
-      { html: '&nbsp;&nbsp;<span class="c-attr">padding</span>: <span class="c-str">24px</span>;' },
-      { html: '}' }
-    ]
-  },
-  {
-    lang: 'JavaScript',
-    tab: 'script.js',
-    lines: [
-      { html: '<span class="c-tag">function</span> <span class="c-attr">runApp</span>() {' },
-      { html: '&nbsp;&nbsp;<span class="c-attr">console</span>.log(<span class="c-str">"CodeForge ready!"</span>);' },
-      { html: '&nbsp;&nbsp;<span class="c-attr">document</span>.querySelector(<span class="c-str">".card"</span>)' },
-      { html: '&nbsp;&nbsp;&nbsp;&nbsp;.classList.add(<span class="c-str">"active"</span>);' },
-      { html: '}' }
-    ]
-  },
-  {
-    lang: 'Python',
     tab: 'main.py',
     lines: [
-      { html: '<span class="c-tag">def</span> <span class="c-attr">fibonacci</span>(n):' },
-      { html: '&nbsp;&nbsp;a, b = <span class="c-str">0</span>, <span class="c-str">1</span>' },
-      { html: '&nbsp;&nbsp;<span class="c-tag">for</span> _ <span class="c-tag">in</span> range(n):' },
-      { html: '&nbsp;&nbsp;&nbsp;&nbsp;print(a, end=<span class="c-str">" "</span>)' },
-      { html: '&nbsp;&nbsp;&nbsp;&nbsp;a, b = b, a + b' }
+      `${t('def')} ${a('fibonacci')}(n):`,
+      `${sp(4)}a, b = ${q('0')}, ${q('1')}`,
+      `${sp(4)}${t('for')} _ ${t('in')} range(n):`,
+      `${sp(8)}print(a, end=${q('" "')})`,
+      `${sp(8)}a, b = b, a + b`
     ]
   },
   {
-    lang: 'StykAnime',
-    tab: 'fight.stk',
+    tab: 'app.ts',
     lines: [
-      { html: '<span class="c-tag">// StykAnime 2D Animation Engine</span>' },
-      { html: '<span class="c-attr">hero</span>.pose(<span class="c-str">"katana-slash"</span>);' },
-      { html: '<span class="c-attr">hero</span>.aura(<span class="c-str">"#38bdf8"</span>, <span class="c-str">"super-saiyan"</span>);' },
-      { html: '<span class="c-attr">rival</span>.pose(<span class="c-str">"guard-block"</span>);' },
-      { html: '<span class="c-attr">studio</span>.exportToWorkspace();' }
+      `${t('interface')} ${a('Task')} { title: string; done: boolean }`,
+      ``,
+      `${t('const')} tasks: ${a('Task')}[] = [{ title: ${q('"Ship it"')}, done: ${q('true')} }];`,
+      `${t('const')} open = tasks.filter(x =&gt; !x.done);`,
+      `console.log(${q('`${open.length} open`')});`
+    ]
+  },
+  {
+    tab: 'main.cpp',
+    lines: [
+      `${t('#include')} ${q('&lt;iostream&gt;')}`,
+      `${t('int')} ${a('main')}() {`,
+      `${sp(4)}std::cout &lt;&lt; ${q('"Compiled on a phone\\n"')};`,
+      `${sp(4)}${t('return')} ${q('0')};`,
+      `}`
+    ]
+  },
+  {
+    tab: 'style.css',
+    lines: [
+      `${t('.card')} {`,
+      `${sp(2)}${a('background')}: ${q('#131519')};`,
+      `${sp(2)}${a('border-radius')}: ${q('16px')};`,
+      `${sp(2)}${a('padding')}: ${q('24px')};`,
+      `}`
     ]
   }
 ];
 
-export const LandingPage: React.FC<LandingPageProps> = ({
-  onLaunchIde,
-  onDownloadZip,
-  onExportAndroid
-}) => {
+const FEATURES = [
+  {
+    title: 'The Monaco editor',
+    text: 'The editing engine behind VS Code: syntax highlighting, IntelliSense and bracket colorization, tuned for touch.'
+  },
+  {
+    title: 'Run code instantly',
+    text: 'Python, JavaScript and TypeScript run right in the browser. C, C++ and Java compile on a remote server.'
+  },
+  {
+    title: 'Live preview',
+    text: 'See HTML, CSS and JavaScript render beside your code, with an in-app console for errors and logs.'
+  },
+  {
+    title: 'Local Git',
+    text: 'Branches, commits and diffs, stored on your device. No account and no server required.'
+  },
+  {
+    title: 'AI assistant',
+    text: 'Explain code, fix bugs and generate components with Gemini or OpenAI, using your own API key.'
+  },
+  {
+    title: 'StykAnime Studio',
+    text: 'A 2D stick-figure animator built in. Pose characters by touch, then export your animation as code, GIF or video.'
+  }
+];
+
+const LANGUAGES: { name: string; how: string; tag: string; net?: boolean }[] = [
+  { name: 'Python', how: 'Runs in your browser with Pyodide (Python 3.12), including input() and plots.', tag: 'In browser' },
+  { name: 'JavaScript', how: 'Runs in your browser, with top-level await and a live console.', tag: 'In browser' },
+  { name: 'TypeScript', how: 'Types are stripped on the fly, then your code runs in the browser.', tag: 'In browser' },
+  { name: 'HTML & CSS', how: 'Instant split-screen preview with your linked or inline styles and scripts.', tag: 'In browser' },
+  { name: 'C & C++', how: 'Compiled with GCC on a remote compiler server, with stdin support.', tag: 'Needs internet', net: true },
+  { name: 'Java', how: 'Compiled and run on a remote OpenJDK server, with stdin support.', tag: 'Needs internet', net: true }
+];
+
+export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloadZip, onExportAndroid }) => {
   const stars = useGithubStars();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
+  const [showTop, setShowTop] = useState(false);
 
-  // Typewriter rotating word
-  const [wordIndex, setWordIndex] = useState(0);
-  const [displayWord, setDisplayWord] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Mock editor cycling language
+  // Mockup: cycle through languages until the visitor picks one
   const [snippetIndex, setSnippetIndex] = useState(0);
   const [visibleLines, setVisibleLines] = useState(0);
-
-  // Mouse Spotlight and 3D Tilt State
-  const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
-  const [mockupTilt, setMockupTilt] = useState({ rx: 0, ry: 0 });
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [showBackToTop, setShowBackToTop] = useState(false);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mockupRef = useRef<HTMLDivElement>(null);
+  const [autoplay, setAutoplay] = useState(true);
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -178,190 +177,53 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  // Scroll Progress & Back to top tracker
   useEffect(() => {
-    const handleScroll = () => {
-      const el = containerRef.current;
-      if (el) {
-        const total = el.scrollHeight - el.clientHeight;
-        const current = el.scrollTop;
-        const pct = total > 0 ? (current / total) * 100 : 0;
-        setScrollProgress(pct);
-        setShowBackToTop(current > 320);
-      } else {
-        const total = document.documentElement.scrollHeight - window.innerHeight;
-        const current = window.scrollY;
-        const pct = total > 0 ? (current / total) * 100 : 0;
-        setScrollProgress(pct);
-        setShowBackToTop(current > 320);
-      }
-    };
-
-    if (containerRef.current) {
-      containerRef.current.addEventListener('scroll', handleScroll, { passive: true });
-    }
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      if (containerRef.current) {
-        containerRef.current.removeEventListener('scroll', handleScroll);
-      }
-      window.removeEventListener('scroll', handleScroll);
-    };
+    const onScroll = () => setShowTop(window.scrollY > 520);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Intersection Observer for Reveal-on-Scroll
+  // Reveal on scroll
   useEffect(() => {
+    const els = Array.from(document.querySelectorAll('.lp-reveal'));
+    if (!('IntersectionObserver' in window)) {
+      els.forEach(el => el.classList.add('is-revealed'));
+      return;
+    }
     const observer = new IntersectionObserver(
-      entries => {
+      entries =>
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             entry.target.classList.add('is-revealed');
+            observer.unobserve(entry.target);
           }
-        });
-      },
-      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+        }),
+      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
     );
-
-    const revealElements = document.querySelectorAll('.reveal-on-scroll');
-    revealElements.forEach(el => observer.observe(el));
-
+    els.forEach(el => observer.observe(el));
     return () => observer.disconnect();
   }, []);
 
-  // Particle Trail Mouse Animation (Matching CV Builder & CodeForge)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // Only activate on devices with fine pointer (mouse / trackpad)
-    const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
-    if (!hasFinePointer) return;
-
-    let lastCreated = 0;
-    const activeDots = new Set<HTMLDivElement>();
-
-    const handleTrailingMouseMove = (e: MouseEvent) => {
-      const now = Date.now();
-      // Throttle to ~18-20ms for smooth 60fps performance
-      if (now - lastCreated < 20) return;
-      lastCreated = now;
-
-      const dot = document.createElement('div');
-      dot.className = 'cursor-trail-dot';
-      dot.style.position = 'fixed';
-      dot.style.left = `${e.clientX}px`;
-      dot.style.top = `${e.clientY}px`;
-      dot.style.width = '7px';
-      dot.style.height = '7px';
-      dot.style.marginLeft = '-3.5px';
-      dot.style.marginTop = '-3.5px';
-      dot.style.background = 'linear-gradient(135deg, #3b82f6, #6366f1, #06b6d4)';
-      dot.style.boxShadow = '0 0 10px rgba(59, 130, 246, 0.85), 0 0 20px rgba(99, 102, 241, 0.45)';
-      dot.style.borderRadius = '50%';
-      dot.style.opacity = '0.9';
-      dot.style.transform = 'scale(1)';
-      dot.style.transition = 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
-      dot.style.pointerEvents = 'none';
-      dot.style.zIndex = '99999';
-
-      document.body.appendChild(dot);
-      activeDots.add(dot);
-
-      setTimeout(() => {
-        dot.style.opacity = '0';
-        dot.style.transform = 'scale(0.2)';
-        dot.style.width = '0px';
-        dot.style.height = '0px';
-      }, 40);
-
-      setTimeout(() => {
-        if (dot && dot.parentNode) {
-          dot.remove();
-        }
-        activeDots.delete(dot);
-      }, 550);
-    };
-
-    document.addEventListener('mousemove', handleTrailingMouseMove, { passive: true });
-
-    return () => {
-      document.removeEventListener('mousemove', handleTrailingMouseMove);
-      activeDots.forEach(d => {
-        if (d && d.parentNode) d.remove();
-      });
-      activeDots.clear();
-    };
-  }, []);
-
-  // Typewriter effect
-  useEffect(() => {
-    const current = TYPEWRITER_WORDS[wordIndex];
-    let timeout: ReturnType<typeof setTimeout>;
-
-    if (!isDeleting && displayWord === current) {
-      timeout = setTimeout(() => setIsDeleting(true), 1800);
-    } else if (isDeleting && displayWord === '') {
-      setIsDeleting(false);
-      setWordIndex(i => (i + 1) % TYPEWRITER_WORDS.length);
-    } else {
-      timeout = setTimeout(
-        () => {
-          setDisplayWord(prev =>
-            isDeleting ? current.slice(0, prev.length - 1) : current.slice(0, prev.length + 1)
-          );
-        },
-        isDeleting ? 45 : 90
-      );
-    }
-    return () => clearTimeout(timeout);
-  }, [displayWord, isDeleting, wordIndex]);
-
-  // Cycle mock snippets + line-by-line reveal
+  // Type the snippet line by line, then move on
   useEffect(() => {
     setVisibleLines(0);
+    const total = SNIPPETS[snippetIndex].lines.length;
     const lineTimer = setInterval(() => {
       setVisibleLines(v => {
-        if (v >= MOCK_SNIPPETS[snippetIndex].lines.length) {
+        if (v >= total) {
           clearInterval(lineTimer);
           return v;
         }
         return v + 1;
       });
-    }, 220);
-
-    const switchTimer = setTimeout(() => {
-      setSnippetIndex(i => (i + 1) % MOCK_SNIPPETS.length);
-    }, 4200);
-
+    }, 240);
+    const next = autoplay ? setTimeout(() => setSnippetIndex(i => (i + 1) % SNIPPETS.length), 4600) : undefined;
     return () => {
       clearInterval(lineTimer);
-      clearTimeout(switchTimer);
+      if (next) clearTimeout(next);
     };
-  }, [snippetIndex]);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    setMousePos({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMockupMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!mockupRef.current) return;
-    const rect = mockupRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const rx = ((y / rect.height) - 0.5) * -12;
-    const ry = ((x / rect.width) - 0.5) * 12;
-    setMockupTilt({ rx, ry });
-  };
-
-  const handleMockupMouseLeave = () => {
-    setMockupTilt({ rx: 0, ry: 0 });
-  };
-
-  const scrollToTop = () => {
-    if (containerRef.current) {
-      containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [snippetIndex, autoplay]);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
@@ -373,560 +235,426 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
-  const currentSnippet = MOCK_SNIPPETS[snippetIndex];
+  const snippet = SNIPPETS[snippetIndex];
+  const starBadge =
+    stars !== null ? (
+      <span className="lp-stars">
+        <Star size={15} fill="currentColor" /> {formatStars(stars)}
+      </span>
+    ) : null;
 
   return (
-    <div className="landing-container" ref={containerRef} onMouseMove={handleMouseMove}>
-      {/* Scroll Progress Bar */}
-      <div className="scroll-progress-bar" style={{ width: `${scrollProgress}%` }} />
-
-      {/* Mouse Spotlight Glow */}
-      <div
-        className="mouse-spotlight"
-        style={{
-          left: `${mousePos.x}px`,
-          top: `${mousePos.y}px`
-        }}
-      />
-
-      {/* Floating Ambient Particles in Background */}
-      <div className="floating-particles-container" aria-hidden="true">
-        <span className="floating-particle p-1">{'<code />'}</span>
-        <span className="floating-particle p-2">{'{ state }'}</span>
-        <span className="floating-particle p-3">fn() =&gt;</span>
-        <span className="floating-particle p-4">const dev = true;</span>
-        <span className="floating-particle p-5">01011001</span>
-        <span className="floating-particle p-6">async / await</span>
-      </div>
-
-      {/* Navbar */}
-      <nav className="landing-nav">
-        <div className="nav-content">
-          <div className="nav-brand">
-            <div className="nav-logo">
-              <img src="./icon-192.png" alt="CodeForge logo" width={34} height={34} />
+    <div className="lp">
+      {/* ---------- navigation ---------- */}
+      <nav className="lp-nav" aria-label="Main">
+        <div className="lp-wrap lp-nav-inner">
+          <a className="lp-brand" href="#top" aria-label="CodeForge Mobile home">
+            <img src="./icon-192.png" alt="" width={38} height={38} />
+            <div>
+              CodeForge <span>Mobile</span>
             </div>
-            <span className="brand-name">
-              CodeForge <span className="brand-sub">Mobile</span>
-            </span>
-          </div>
-
-          <div className="nav-links">
+          </a>
+          <div className="lp-links">
             <a href="#features">Features</a>
-            <a href="#landscape">VS Code Vibe</a>
+            <a href="#languages">Languages</a>
             <a href="#download">Download</a>
-            <a href="#author">Creator</a>
+            <a href="#creator">Creator</a>
             <a href="#community">Community</a>
           </div>
-
-          <div className="nav-actions">
-            <a
-              href="https://github.com/khalidabdullahh/CodeForgeMobile"
-              target="_blank"
-              rel="noreferrer"
-              className="github-btn"
-              title="Star on GitHub"
-            >
-              <Github size={16} />
-              <span>Star Repo</span>
-              {stars !== null && (
-                <b className="star-count">
-                  <Star size={12} /> {formatStars(stars)}
-                </b>
-              )}
+          <div className="lp-nav-actions">
+            <a className="lp-btn lp-btn-ghost lp-btn-sm" href={REPO} target="_blank" rel="noreferrer">
+              <Github size={17} /> GitHub {starBadge}
             </a>
-            <a className="install-nav-btn" href={APK_URL} download rel="noreferrer">
-              <Download size={15} />
-              <span>Download APK</span>
-            </a>
+            <button className="lp-btn lp-btn-primary lp-btn-sm" onClick={onLaunchIde}>
+              Launch IDE
+            </button>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <header className="hero-section">
-        <div className="hero-badge anim-fade-up">
-          <Sparkles size={14} className="text-yellow-400" />
-          <span>Android-First VS Code-Inspired Mobile IDE · 100% Free · Source-Available</span>
-        </div>
-
-        <h1 className="hero-title anim-fade-up delay-1">
-          Code. Create.{' '}
-          <span className="typewriter-word">
-            {displayWord}
-            <span className="typewriter-cursor">|</span>
-          </span>
-          <br />
-          <span className="gradient-text">Right from Your Phone</span>
-        </h1>
-
-        <p className="hero-subtitle anim-fade-up delay-2">
-          Full desktop VS Code experience in your pocket. Edit{' '}
-          <strong>HTML, CSS, JavaScript &amp; Python</strong> with Monaco Editor, AI Copilot,
-          offline Git, live preview and one-tap symbol toolbar.
-        </p>
-
-        <div className="hero-cta-group anim-fade-up delay-3">
-          <button className="cta-primary pulse-glow" onClick={onLaunchIde}>
-            <Play size={18} />
-            <span>Launch Web IDE</span>
-            <ArrowRight size={18} />
-          </button>
-
-          <a className="cta-install" href={APK_URL} download rel="noreferrer">
-            <Download size={18} />
-            <span>Download Android APK</span>
-          </a>
-
-          <a
-            href="https://github.com/khalidabdullahh/CodeForgeMobile"
-            target="_blank"
-            rel="noreferrer"
-            className="cta-secondary"
-          >
-            <Github size={17} />
-            <span>Star on GitHub</span>
-            {stars !== null && (
-              <b className="star-count">
-                <Star size={12} /> {formatStars(stars)}
-              </b>
-            )}
-          </a>
-        </div>
-
-        {/* Languages pill strip */}
-        <div className="lang-pills anim-fade-up delay-4">
-          <span className="lang-pill html">HTML</span>
-          <span className="lang-pill css">CSS</span>
-          <span className="lang-pill js">JavaScript</span>
-          <span className="lang-pill py">Python</span>
-          <span className="lang-pill more">+ Markdown, JSON, TS…</span>
-        </div>
-
-        {/* Hero Interactive App Mockup Frame with 3D Tilt */}
-        <div
-          className="hero-mockup-wrapper anim-fade-up delay-5 tilt-card-3d"
-          ref={mockupRef}
-          onMouseMove={handleMockupMouseMove}
-          onMouseLeave={handleMockupMouseLeave}
-          style={{
-            transform: `perspective(1000px) rotateX(${mockupTilt.rx}deg) rotateY(${mockupTilt.ry}deg)`
-          }}
-        >
-          <div className="mockup-header">
-            <div className="mockup-dots">
-              <span className="dot red" />
-              <span className="dot yellow" />
-              <span className="dot green" />
-            </div>
-            <span className="mockup-title">codeforge-workspace — {currentSnippet.lang}</span>
-            <button className="mockup-live-btn" onClick={onLaunchIde}>
-              <Maximize2 size={13} /> Open Fullscreen
+      {/* ---------- hero ---------- */}
+      <header className="lp-hero" id="top">
+        <div className="lp-wrap">
+          <span className="lp-eyebrow">The mobile IDE · Free to use · Source-available</span>
+          <h1>
+            A real code editor, <em>in your pocket.</em>
+          </h1>
+          <p className="lp-hero-sub">
+            CodeForge Mobile brings the Monaco editor, a live terminal, local Git and an AI assistant to your phone.
+            Write and run Python, JavaScript, TypeScript, C++ and more, wherever you happen to be.
+          </p>
+          <div className="lp-cta">
+            <button className="lp-btn lp-btn-primary" onClick={onLaunchIde}>
+              <Play size={18} /> Launch Web IDE <ArrowRight size={18} />
             </button>
+            <a className="lp-btn lp-btn-ghost" href={APK_URL} download rel="noreferrer">
+              <Download size={18} /> Download for Android
+            </a>
           </div>
+          <p className="lp-meta">Android app · Installable web app · No account required</p>
 
-          <div className="mockup-body">
-            <div className="mockup-sidebar">
-              <div className="mockup-sidebar-title">EXPLORER</div>
-              {MOCK_SNIPPETS.map((s, i) => (
-                <div
-                  key={s.tab}
-                  className={`mockup-file ${i === snippetIndex ? 'selected' : ''}`}
-                >
-                  {s.lang === 'HTML' && '📄 '}
-                  {s.lang === 'CSS' && '🎨 '}
-                  {s.lang === 'JavaScript' && '⚡ '}
-                  {s.lang === 'Python' && '🐍 '}
-                  {s.tab}
-                </div>
-              ))}
-            </div>
-
-            <div className="mockup-editor-area">
-              <div className="mockup-tabs">
-                <div className="mockup-tab active">{currentSnippet.tab} ✕</div>
+          <div className="lp-window" aria-label="Editor preview">
+            <div className="lp-window-bar">
+              <div className="lp-dots" aria-hidden="true">
+                <i />
+                <i />
+                <i />
               </div>
-              <div className="mockup-code">
-                {currentSnippet.lines.slice(0, visibleLines).map((line, idx) => (
-                  <span
-                    key={`${snippetIndex}-${idx}`}
-                    className="code-line typing-line"
-                    dangerouslySetInnerHTML={{ __html: line.html }}
-                  />
+              <div className="lp-tabs" role="tablist">
+                {SNIPPETS.map((s, i) => (
+                  <button
+                    key={s.tab}
+                    role="tab"
+                    aria-selected={i === snippetIndex}
+                    className={`lp-tab ${i === snippetIndex ? 'active' : ''}`}
+                    onClick={() => {
+                      setAutoplay(false);
+                      setSnippetIndex(i);
+                    }}
+                  >
+                    {s.tab}
+                  </button>
                 ))}
-                {visibleLines < currentSnippet.lines.length && (
-                  <span className="code-line">
-                    <span className="typewriter-cursor">|</span>
-                  </span>
-                )}
               </div>
-
-              <div className="mockup-symbol-bar">
-                <span>{'{ }'}</span>
-                <span>( )</span>
-                <span>[ ]</span>
-                <span>=&gt;</span>
-                <span>;</span>
-                <span>===</span>
-                <span>" "</span>
-                <span>Tab</span>
-              </div>
+            </div>
+            <div className="lp-code" aria-hidden="true">
+              {snippet.lines.slice(0, visibleLines).map((line, idx) => (
+                <span key={`${snippetIndex}-${idx}`} className="ln">
+                  <span className="num">{idx + 1}</span>
+                  <span dangerouslySetInnerHTML={{ __html: line || '&nbsp;' }} />
+                </span>
+              ))}
+              {visibleLines < snippet.lines.length && (
+                <span className="ln">
+                  <span className="num">{visibleLines + 1}</span>
+                  <span className="caret" />
+                </span>
+              )}
+            </div>
+            <div className="lp-window-foot">
+              <span>codeforge-workspace / {snippet.tab}</span>
+              <span>Landscape mode adds a split-screen live preview</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Landscape Feature Highlight */}
-      <section id="landscape" className="feature-highlight-section reveal-on-scroll">
-        <div className="section-header">
-          <div className="section-pill">
-            <Smartphone size={14} />
-            <span>PRO LANDSCAPE EXPERIENCE</span>
+      {/* ---------- proof strip ---------- */}
+      <section className="lp-strip" aria-label="At a glance">
+        <div className="lp-wrap lp-strip-grid">
+          <div className="lp-stat">
+            <b>8</b>
+            <span>Languages</span>
           </div>
-          <h2>Turn Your Phone into a Full Dev Machine</h2>
-          <p>
-            Flip your phone to <strong>Landscape Mode</strong> to unlock the genuine desktop VS Code vibe
-            with side-by-side split editor, live interactive runtime preview, and docked terminal.
-          </p>
-        </div>
-
-        <div className="landscape-grid">
-          <div className="landscape-card anim-card">
-            <div className="icon-badge">
-              <Columns size={20} />
-            </div>
-            <h3>Split-Screen Preview</h3>
-            <p>Code on the left, see instant live preview changes on the right with in-app console logging.</p>
+          <div className="lp-stat">
+            <b>6</b>
+            <span>Editor themes</span>
           </div>
-
-          <div className="landscape-card anim-card">
-            <div className="icon-badge">
-              <Keyboard size={20} />
-            </div>
-            <h3>Quick Symbol Bar</h3>
-            <p>One-tap brackets, quotes, arrows, and operators so you don't struggle with mobile keyboard switches.</p>
+          <div className="lp-stat">
+            <b>0</b>
+            <span>Accounts needed</span>
           </div>
-
-          <div className="landscape-card anim-card">
-            <div className="icon-badge">
-              <Bot size={20} />
-            </div>
-            <h3>AI Coding Copilot</h3>
-            <p>Integrated Gemini & OpenAI assistant to explain code, fix bugs, and generate components automatically.</p>
+          <div className="lp-stat">
+            <b>Free</b>
+            <span>To use, always</span>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section id="features" className="features-section reveal-on-scroll">
-        <div className="section-header">
-          <div className="section-pill">
-            <Zap size={14} />
-            <span>BUILT FOR DEVELOPERS</span>
+      {/* ---------- features ---------- */}
+      <section className="lp-section" id="features">
+        <div className="lp-wrap">
+          <div className="lp-section-head lp-reveal">
+            <span className="lp-eyebrow">What is inside</span>
+            <h2>
+              Everything you need to build, <em>nothing you don&rsquo;t.</em>
+            </h2>
+            <p>A focused set of tools for writing, running and shipping small projects entirely from a phone.</p>
           </div>
-          <h2>Packed with Everything You Need</h2>
-          <p style={{ color: '#94a3b8', maxWidth: 560, margin: '0 auto' }}>
-            Full editing support for <strong>HTML, CSS, JavaScript &amp; Python</strong> (Pyodide) —
-            plus Markdown, JSON, TypeScript and more.
-          </p>
-        </div>
-
-        <div className="features-grid">
-          <div className="feat-box anim-card">
-            <div className="feat-icon">
-              <Code2 size={22} />
-            </div>
-            <h4>Monaco Editor Engine</h4>
-            <p>
-              The exact same syntax highlighting, IntelliSense, and bracket pair colorization engine powering VS Code.
-              Edit HTML, CSS, JS &amp; Python with full language intelligence.
-            </p>
-          </div>
-
-          <div className="feat-box anim-card">
-            <div className="feat-icon">
-              <Palette size={22} />
-            </div>
-            <h4>6 Pro Themes</h4>
-            <p>Switch seamlessly between Dracula, One Dark Pro, Monokai, Synthwave '84, VS Dark, and VS Light.</p>
-          </div>
-
-          <div className="feat-box anim-card">
-            <div className="feat-icon">
-              <FolderGit2 size={22} />
-            </div>
-            <h4>Local Git & Source Control</h4>
-            <p>Manage branch switches, commit histories, and change tracking fully offline without internet connection.</p>
-          </div>
-
-          <div className="feat-box anim-card">
-            <div className="feat-icon">
-              <Terminal size={22} />
-            </div>
-            <h4>Console & Python Runtime</h4>
-            <p>
-              Live JS console + in-browser Python (Pyodide). Run <code>python main.py</code> directly from the terminal.
-            </p>
-          </div>
-
-          <div className="feat-box anim-card">
-            <div className="feat-icon">
-              <Smartphone size={22} />
-            </div>
-            <h4>Capacitor Android Packaging</h4>
-            <p>Ready-to-compile Android project settings to produce native APK and AAB binaries with Android Studio.</p>
-          </div>
-
-          <div className="feat-box anim-card">
-            <div className="feat-icon">
-              <Globe size={22} />
-            </div>
-            <h4>100% Offline PWA</h4>
-            <p>Installable directly from your browser as a standalone app that works seamlessly without WiFi.</p>
-          </div>
-
-          <div className="feat-box anim-card" style={{ borderColor: 'rgba(56, 189, 248, 0.4)' }}>
-            <div className="feat-icon" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
-              <Film size={22} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <h4 style={{ margin: 0 }}>StykAnime 2D Studio</h4>
-              <span style={{ fontSize: 10, background: '#2563eb', color: '#fff', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>NEW</span>
-            </div>
-            <p>
-              Pivot &amp; Stick Nodes-inspired 2D animator built right into your IDE. Drag joints with touch, create anime fights with Ki auras and katana slashes, and export directly as runnable HTML5 Canvas code!
-            </p>
+          <div className="lp-features lp-reveal">
+            {FEATURES.map((f, i) => (
+              <article className="lp-feature" key={f.title}>
+                <span className="no">{String(i + 1).padStart(2, '0')}</span>
+                <h3>{f.title}</h3>
+                <p>{f.text}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Download & Installation Section */}
-      <section id="download" className="download-section reveal-on-scroll">
-        <div className="download-card">
-          <h2>Get CodeForge Mobile Today</h2>
-          <p>Choose how you want to run or build CodeForge on your devices.</p>
+      {/* ---------- experience ---------- */}
+      <section className="lp-section" style={{ paddingTop: 0 }}>
+        <div className="lp-wrap lp-split">
+          <div className="lp-section-head lp-reveal">
+            <span className="lp-eyebrow">Made for the phone</span>
+            <h2>
+              Turn your phone into <em>a workstation.</em>
+            </h2>
+            <p>Hold it upright for focused editing, or flip to landscape for the full desktop-style layout.</p>
+          </div>
+          <ul className="lp-points lp-reveal">
+            <li>
+              <h3>Split-screen preview</h3>
+              <p>Code on the left, live result on the right, with a docked terminal below.</p>
+            </li>
+            <li>
+              <h3>One-tap symbol bar</h3>
+              <p>Brackets, quotes, arrows and Tab are always a tap away, so you never fight the keyboard.</p>
+            </li>
+            <li>
+              <h3>Six editor themes</h3>
+              <p>Dracula, One Dark Pro, Monokai, Synthwave &rsquo;84, VS Dark and VS Light.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
 
-          <div className="download-options">
-            <div className="download-tile anim-card">
-              <Smartphone size={28} />
-              <h4>Android App (APK)</h4>
-              <p>Download the ready-to-install app and open it on your Android phone. Allow "Install unknown apps" when asked.</p>
-              <a className="tile-btn" href={APK_URL} download rel="noreferrer">
-                <Download size={15} /> Download APK
+      {/* ---------- languages ---------- */}
+      <section className="lp-section" id="languages" style={{ paddingTop: 0 }}>
+        <div className="lp-wrap">
+          <div className="lp-section-head lp-reveal">
+            <span className="lp-eyebrow">Languages</span>
+            <h2>
+              Run it, <em>don&rsquo;t just edit it.</em>
+            </h2>
+            <p>Here is exactly what runs where, so there are no surprises.</p>
+          </div>
+          <div className="lp-langs lp-reveal">
+            {LANGUAGES.map(l => (
+              <div className="lp-lang-row" key={l.name}>
+                <h3>{l.name}</h3>
+                <p>{l.how}</p>
+                <span className={`tag ${l.net ? 'net' : ''}`}>{l.tag}</span>
+              </div>
+            ))}
+          </div>
+          <p className="lp-note">
+            Remote compilers are shared public services, so C, C++ and Java need an internet connection and may be
+            rate limited at busy times.
+          </p>
+        </div>
+      </section>
+
+      {/* ---------- download ---------- */}
+      <section className="lp-section lp-download" id="download">
+        <div className="lp-wrap">
+          <div className="lp-section-head center lp-reveal">
+            <span className="lp-eyebrow">Get started</span>
+            <h2>
+              Take it with you, <em>or try it now.</em>
+            </h2>
+            <p>Install the Android app, add the web app to your home screen, or just open it in your browser.</p>
+          </div>
+          <div className="lp-tiles lp-reveal">
+            <div className="lp-tile featured">
+              <h3>Android app</h3>
+              <p>
+                The ready-to-install APK. When Android asks, allow &ldquo;Install unknown apps&rdquo; for your browser.
+              </p>
+              <a className="lp-btn lp-btn-primary lp-btn-sm" href={APK_URL} download rel="noreferrer">
+                <Download size={17} /> Download APK
               </a>
-              <a className="tile-link" href={RELEASES_URL} target="_blank" rel="noreferrer">
+              <a className="lp-tile-link" href={RELEASES_URL} target="_blank" rel="noreferrer">
                 All releases
               </a>
             </div>
-
-            <div className="download-tile anim-card">
-              <Globe size={28} />
-              <h4>1-Click Install App (PWA)</h4>
-              <p>Install directly to your Android home screen for instant offline use.</p>
-              <button className="tile-btn" onClick={handleInstallClick}>
-                <Download size={15} /> Install to Home Screen
+            <div className="lp-tile">
+              <h3>Web app</h3>
+              <p>Install it to your home screen as a standalone app, or launch the IDE straight in your browser.</p>
+              <button className="lp-btn lp-btn-ghost lp-btn-sm" onClick={handleInstallClick}>
+                <Download size={17} /> Add to home screen
+              </button>
+              <button className="lp-tile-link" onClick={onLaunchIde}>
+                Or open the IDE now
               </button>
             </div>
-
-            <div className="download-tile anim-card">
-              <Download size={28} />
-              <h4>Full Source ZIP</h4>
-              <p>Download the complete project workspace as a .zip file.</p>
-              <button className="tile-btn secondary" onClick={onDownloadZip}>
-                <Download size={15} /> Download .ZIP
+            <div className="lp-tile">
+              <h3>Project files</h3>
+              <p>Download your workspace as a .zip, or export the Capacitor setup to build the Android app yourself.</p>
+              <button className="lp-btn lp-btn-ghost lp-btn-sm" onClick={onDownloadZip}>
+                <Download size={17} /> Download .zip
               </button>
-            </div>
-
-            <div className="download-tile anim-card">
-              <Smartphone size={28} />
-              <h4>Android APK Setup</h4>
-              <p>Export Capacitor configuration & Android Studio build guides.</p>
-              <button className="tile-btn secondary" onClick={onExportAndroid}>
-                <Download size={15} /> Export Android Config
+              <button className="lp-tile-link" onClick={onExportAndroid}>
+                Export Android config
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Author & Owner Section */}
-      <section id="author" className="author-section reveal-on-scroll">
-        <div className="author-card">
-          <img
-            className="author-avatar"
-            src="https://github.com/khalidabdullahh.png?size=240"
-            alt="Khalid Abdullah"
-            width={96}
-            height={96}
-            loading="lazy"
-          />
-          <div className="author-body">
-            <span className="author-role">Author &amp; Owner</span>
-            <h2>Khalid Abdullah</h2>
-            <p className="author-bio">
-              Computer Science student from Bangladesh with a curiosity for technology, mathematics and problem
-              solving. I built CodeForge Mobile so anyone with just a phone can learn and write real code.
+      {/* ---------- creator ---------- */}
+      <section className="lp-section" id="creator">
+        <div className="lp-wrap">
+          <div className="lp-author lp-reveal">
+            <img
+              className="lp-avatar"
+              src="https://github.com/khalidabdullahh.png?size=264"
+              alt="Khalid Abdullah"
+              width={132}
+              height={132}
+              loading="lazy"
+              onError={e => {
+                const img = e.currentTarget;
+                if (!img.dataset.fallback) {
+                  img.dataset.fallback = '1';
+                  img.src = './icon-192.png';
+                }
+              }}
+            />
+            <div>
+              <span className="lp-eyebrow">Author &amp; owner</span>
+              <h2>Khalid Abdullah</h2>
+              <p>
+                A computer science student from Bangladesh, curious about technology, mathematics and problem solving.
+                I built CodeForge Mobile so that anyone with just a phone can learn and write real code.
+              </p>
+              <div className="lp-author-links">
+                <a href="https://github.com/khalidabdullahh" target="_blank" rel="noreferrer">
+                  <Github size={17} /> GitHub
+                </a>
+                <a href="https://khalidslab.pages.dev" target="_blank" rel="noreferrer">
+                  <Globe size={17} /> Portfolio
+                </a>
+                <a href="https://x.com/voiceoffkhalid" target="_blank" rel="noreferrer">
+                  <ExternalLink size={17} /> @voiceoffkhalid
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- community ---------- */}
+      <section className="lp-section lp-community" id="community" style={{ paddingTop: 0 }}>
+        <div className="lp-wrap">
+          <div className="lp-section-head center lp-reveal">
+            <span className="lp-eyebrow">Community</span>
+            <h2>
+              Free to use. <em>Open to ideas.</em>
+            </h2>
+            <p>
+              The source code is public. Read it, learn from it, report bugs and send pull requests, all of it is
+              welcome.
             </p>
-            <div className="author-links">
-              <a href="https://github.com/khalidabdullahh" target="_blank" rel="noreferrer">
-                <Github size={16} /> GitHub
-              </a>
-              <a href="https://khalidslab.pages.dev" target="_blank" rel="noreferrer">
-                <Globe size={16} /> Portfolio
-              </a>
-              <a href="https://x.com/voiceoffkhalid" target="_blank" rel="noreferrer">
-                <ExternalLink size={16} /> @voiceoffkhalid
-              </a>
+          </div>
+          <div className="lp-cta lp-reveal" style={{ marginTop: 0 }}>
+            <a className="lp-btn lp-btn-primary" href={REPO} target="_blank" rel="noreferrer">
+              <Star size={18} /> Star on GitHub {starBadge}
+            </a>
+            <a className="lp-btn lp-btn-ghost" href={`${REPO}/discussions`} target="_blank" rel="noreferrer">
+              Join the discussion
+            </a>
+          </div>
+          <div className="lp-license lp-reveal">
+            <div>
+              <h4>You can</h4>
+              <ul>
+                <li>Use the app for anything</li>
+                <li>Read and learn from the code</li>
+                <li>Fork privately and contribute</li>
+              </ul>
+            </div>
+            <div>
+              <h4>You can&rsquo;t</h4>
+              <ul>
+                <li>Republish it as your own</li>
+                <li>Remove credit or the license</li>
+                <li>Sell it or its copies</li>
+              </ul>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Community Section */}
-      <section id="community" className="support-section reveal-on-scroll">
-        <div className="coffee-container">
-          <div
-            className="coffee-icon-wrap"
-            style={{ background: 'rgba(37, 99, 235, 0.15)', borderColor: 'rgba(59, 130, 246, 0.3)' }}
-          >
-            <Github size={36} className="text-blue-400" />
-          </div>
-          <h2>Join the Community</h2>
-          <p>
-            CodeForge Mobile is 100% free to use and its source code is public, created by{' '}
-            <strong>Khalid Abdullah</strong>. Learn from the code, contribute features, report issues, or star the
-            project on GitHub to help it grow!
+          <p className="lp-note" style={{ marginTop: 18 }}>
+            Source-available, not an OSI-approved open-source license.{' '}
+            <a href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>
+              Read the full license
+            </a>
+            .
           </p>
-
-          <div className="flex gap-3 justify-center flex-wrap">
-            <a
-              href="https://github.com/khalidabdullahh/CodeForgeMobile"
-              target="_blank"
-              rel="noreferrer"
-              className="coffee-main-button"
-              style={{ background: '#2563eb', color: 'white' }}
-            >
-              <Star size={20} />
-              <span>Star on GitHub{stars !== null ? ` · ${formatStars(stars)}` : ' ⭐️'}</span>
-            </a>
-            <button
-              className="coffee-main-button"
-              style={{ background: '#1e293b', color: '#e2e8f0', border: '1px solid #334155' }}
-              onClick={onLaunchIde}
-            >
-              <Play size={20} />
-              <span>Launch Web IDE 🚀</span>
-            </button>
-          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="landing-footer">
-        <div className="footer-content">
-          <div className="footer-brand">
-            <img src="./icon-192.png" alt="" width={22} height={22} className="footer-logo" />
-            <span>CodeForge Mobile</span>
-          </div>
-          <p>© 2026 Khalid Abdullah. All Rights Reserved. Source-Available.</p>
-          <div className="footer-links">
-            <a href="https://github.com/khalidabdullahh/CodeForgeMobile" target="_blank" rel="noreferrer">
-              GitHub Repository
+      {/* ---------- footer ---------- */}
+      <footer className="lp-footer">
+        <div className="lp-wrap lp-footer-inner">
+          <a className="lp-brand" href="#top">
+            <img src="./icon-192.png" alt="" width={30} height={30} />
+            <div>CodeForge Mobile</div>
+          </a>
+          <p>&copy; 2026 Khalid Abdullah. All rights reserved. Free to use, source-available.</p>
+          <nav aria-label="Footer">
+            <a href={REPO} target="_blank" rel="noreferrer">
+              GitHub
             </a>
-            <a
-              href="https://github.com/khalidabdullahh/CodeForgeMobile/blob/main/LICENSE"
-              target="_blank"
-              rel="noreferrer"
-            >
+            <a href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer">
               License
             </a>
-            <a href="https://codeforgemobile.pages.dev" target="_blank" rel="noreferrer">
-              Live Website
+            <a href={RELEASES_URL} target="_blank" rel="noreferrer">
+              Releases
             </a>
-          </div>
+          </nav>
         </div>
       </footer>
 
-      {/* Floating Back to Top Button */}
-      {showBackToTop && (
+      {showTop && (
         <button
-          className="back-to-top-btn pulse-glow"
-          onClick={scrollToTop}
-          aria-label="Scroll to top"
-          title="Back to Top"
+          className="lp-top"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Back to top"
         >
-          <ChevronUp size={20} />
+          <ChevronUp size={22} />
         </button>
       )}
 
-      {/* 1-Click Install Modal */}
+      {/* ---------- install dialog ---------- */}
       {showInstallModal && (
-        <div className="install-modal-backdrop" onClick={() => setShowInstallModal(false)}>
-          <div className="install-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="flex items-center gap-2">
-                <Smartphone className="text-blue-400" size={20} />
-                <h3>Install CodeForge Mobile</h3>
-              </div>
-              <button className="close-btn" onClick={() => setShowInstallModal(false)}>
-                <X size={16} />
+        <div className="lp-modal-backdrop" onClick={() => setShowInstallModal(false)}>
+          <div className="lp-modal" role="dialog" aria-modal="true" aria-label="Install CodeForge Mobile" onClick={e => e.stopPropagation()}>
+            <div className="lp-modal-head">
+              <h3>Install CodeForge Mobile</h3>
+              <button className="lp-modal-close" onClick={() => setShowInstallModal(false)} aria-label="Close">
+                <X size={18} />
               </button>
             </div>
-
-            <div className="modal-content">
-              <div className="install-step">
-                <span className="step-num">1</span>
-                <div>
-                  <b>Direct APK Installation (Android):</b>
-                  <p>
-                    Download the pre-compiled Android APK directly from GitHub Releases to install CodeForge Mobile on
-                    any Android device.
-                  </p>
-                </div>
+            <div className="lp-step">
+              <span className="n">1</span>
+              <div>
+                <b>Android APK</b>
+                <p>Download the APK from GitHub Releases and open it on your Android phone.</p>
               </div>
-
-              <div className="install-step">
-                <span className="step-num">2</span>
-                <div>
-                  <b>Instant PWA Install (No Download Needed):</b>
-                  <p>
-                    Tap the browser menu <strong>(⋮)</strong> in Chrome/Safari and select{' '}
-                    <strong>"Add to Home screen"</strong> to install as a standalone offline app.
-                  </p>
-                </div>
+            </div>
+            <div className="lp-step">
+              <span className="n">2</span>
+              <div>
+                <b>Web app, no download</b>
+                <p>
+                  In Chrome, open the browser menu and choose &ldquo;Add to Home screen&rdquo; (&ldquo;Install app&rdquo; on some devices).
+                </p>
               </div>
-
-              <div className="modal-buttons" style={{ flexDirection: 'column' }}>
-                <a
-                  href={APK_URL}
-                  download
-                  rel="noreferrer"
-                  className="modal-btn-primary"
-                  style={{ textDecoration: 'none' }}
+            </div>
+            <div className="lp-modal-actions">
+              <a className="lp-btn lp-btn-primary lp-btn-sm" href={APK_URL} download rel="noreferrer">
+                <Download size={17} /> Download Android APK
+              </a>
+              <div className="row">
+                <button
+                  className="lp-btn lp-btn-ghost lp-btn-sm"
+                  onClick={() => {
+                    onLaunchIde();
+                    setShowInstallModal(false);
+                  }}
                 >
-                  <Download size={16} /> Download Android APK
-                </a>
-
-                <div className="flex gap-2 w-full">
-                  <button
-                    className="modal-btn-secondary"
-                    onClick={() => {
-                      onLaunchIde();
-                      setShowInstallModal(false);
-                    }}
-                  >
-                    <Play size={15} /> Launch Web IDE
-                  </button>
-                  <button
-                    className="modal-btn-secondary"
-                    onClick={() => {
-                      onDownloadZip();
-                      setShowInstallModal(false);
-                    }}
-                  >
-                    <Download size={15} /> Source .ZIP
-                  </button>
-                </div>
+                  <Play size={16} /> Launch IDE
+                </button>
+                <button
+                  className="lp-btn lp-btn-ghost lp-btn-sm"
+                  onClick={() => {
+                    onDownloadZip();
+                    setShowInstallModal(false);
+                  }}
+                >
+                  <Download size={16} /> .zip
+                </button>
               </div>
             </div>
           </div>

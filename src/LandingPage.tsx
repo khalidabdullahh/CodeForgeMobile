@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, ChevronUp, Download, ExternalLink, Github, Globe, Play, Star, X } from 'lucide-react';
+import { ArrowRight, ChevronUp, Download, ExternalLink, Github, Globe, Menu, Play, Star, X } from 'lucide-react';
 import '@fontsource-variable/cormorant-garamond/wght.css';
 import '@fontsource-variable/cormorant-garamond/wght-italic.css';
 import './landing.css';
@@ -16,6 +16,17 @@ const STARS_CACHE_KEY = 'codeforge-gh-stars';
 const STARS_CACHE_MS = 30 * 60 * 1000;
 const APK_URL = `${REPO}/releases/download/apk-latest/CodeForgeMobile.apk`;
 const RELEASES_URL = `${REPO}/releases`;
+
+type Platform = 'android' | 'ios' | 'other';
+function detectPlatform(): Platform {
+  if (typeof navigator === 'undefined') return 'other';
+  const ua = navigator.userAgent || '';
+  if (/android/i.test(ua)) return 'android';
+  if (/iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1)) return 'ios';
+  return 'other';
+}
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function formatStars(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : String(n);
@@ -162,11 +173,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
   const [showTop, setShowTop] = useState(false);
+  const [showDock, setShowDock] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const platform = React.useMemo(detectPlatform, []);
+  const reduceMotion = React.useMemo(prefersReducedMotion, []);
 
   // Mockup: cycle through languages until the visitor picks one
   const [snippetIndex, setSnippetIndex] = useState(0);
   const [visibleLines, setVisibleLines] = useState(0);
-  const [autoplay, setAutoplay] = useState(true);
+  const [autoplay, setAutoplay] = useState(() => !prefersReducedMotion());
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -178,11 +193,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
   }, []);
 
   useEffect(() => {
-    const onScroll = () => setShowTop(window.scrollY > 520);
+    const onScroll = () => {
+      setShowTop(window.scrollY > 700);
+      setShowDock(window.scrollY > 380);
+    };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   // Reveal on scroll
   useEffect(() => {
@@ -207,8 +232,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
 
   // Type the snippet line by line, then move on
   useEffect(() => {
-    setVisibleLines(0);
     const total = SNIPPETS[snippetIndex].lines.length;
+    if (reduceMotion) {
+      setVisibleLines(total);
+      return;
+    }
+    setVisibleLines(0);
     const lineTimer = setInterval(() => {
       setVisibleLines(v => {
         if (v >= total) {
@@ -223,7 +252,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
       clearInterval(lineTimer);
       if (next) clearTimeout(next);
     };
-  }, [snippetIndex, autoplay]);
+  }, [snippetIndex, autoplay, reduceMotion]);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
@@ -249,33 +278,72 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
       <nav className="lp-nav" aria-label="Main">
         <div className="lp-wrap lp-nav-inner">
           <a className="lp-brand" href="#top" aria-label="CodeForge Mobile home">
-            <img src="./icon-192.png" alt="" width={38} height={38} />
+            <img src="./icon-192.png" alt="" width={36} height={36} />
             <div>
               CodeForge <span>Mobile</span>
             </div>
           </a>
           <div className="lp-links">
             <a href="#features">Features</a>
-            <a href="#languages">Languages</a>
             <a href="#download">Download</a>
+            <a href="#languages">Languages</a>
             <a href="#creator">Creator</a>
             <a href="#community">Community</a>
           </div>
           <div className="lp-nav-actions">
-            <a className="lp-btn lp-btn-ghost lp-btn-sm" href={REPO} target="_blank" rel="noreferrer">
+            <a className="lp-btn lp-btn-ghost lp-btn-sm lp-nav-desktop" href={REPO} target="_blank" rel="noreferrer">
               <Github size={17} /> GitHub {starBadge}
             </a>
-            <button className="lp-btn lp-btn-primary lp-btn-sm" onClick={onLaunchIde}>
+            <button className="lp-btn lp-btn-primary lp-btn-sm lp-nav-desktop" onClick={onLaunchIde}>
               Launch IDE
+            </button>
+            <button
+              className="lp-menu-btn"
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(o => !o)}
+            >
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
         </div>
+        {menuOpen && (
+          <div className="lp-menu">
+            <div className="lp-wrap">
+              {[
+                ['features', 'Features'],
+                ['download', 'Download'],
+                ['languages', 'Languages'],
+                ['creator', 'Creator'],
+                ['community', 'Community']
+              ].map(([id, label]) => (
+                <a key={id} className="item" href={`#${id}`} onClick={() => setMenuOpen(false)}>
+                  {label} <ArrowRight size={18} />
+                </a>
+              ))}
+              <div className="menu-cta">
+                <button
+                  className="lp-btn lp-btn-primary"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onLaunchIde();
+                  }}
+                >
+                  <Play size={18} /> Launch Web IDE
+                </button>
+                <a className="lp-btn lp-btn-ghost" href={REPO} target="_blank" rel="noreferrer">
+                  <Github size={18} /> GitHub {starBadge}
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* ---------- hero ---------- */}
       <header className="lp-hero" id="top">
         <div className="lp-wrap">
-          <span className="lp-eyebrow">The mobile IDE · Free to use · Source-available</span>
+          <span className="lp-eyebrow">The mobile IDE · Free to use</span>
           <h1>
             A real code editor, <em>in your pocket.</em>
           </h1>
@@ -284,12 +352,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
             Write and run Python, JavaScript, TypeScript, C++ and more, wherever you happen to be.
           </p>
           <div className="lp-cta">
-            <button className="lp-btn lp-btn-primary" onClick={onLaunchIde}>
-              <Play size={18} /> Launch Web IDE <ArrowRight size={18} />
-            </button>
-            <a className="lp-btn lp-btn-ghost" href={APK_URL} download rel="noreferrer">
-              <Download size={18} /> Download for Android
-            </a>
+            {platform === 'android' ? (
+              <>
+                <a className="lp-btn lp-btn-primary" href={APK_URL} download rel="noreferrer">
+                  <Download size={18} /> Download for Android
+                </a>
+                <button className="lp-btn lp-btn-ghost" onClick={onLaunchIde}>
+                  <Play size={18} /> Open in browser
+                </button>
+              </>
+            ) : platform === 'ios' ? (
+              <>
+                <button className="lp-btn lp-btn-primary" onClick={onLaunchIde}>
+                  <Play size={18} /> Launch Web IDE <ArrowRight size={18} />
+                </button>
+                <button className="lp-btn lp-btn-ghost" onClick={handleInstallClick}>
+                  <Download size={18} /> Add to Home Screen
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="lp-btn lp-btn-primary" onClick={onLaunchIde}>
+                  <Play size={18} /> Launch Web IDE <ArrowRight size={18} />
+                </button>
+                <a className="lp-btn lp-btn-ghost" href={APK_URL} download rel="noreferrer">
+                  <Download size={18} /> Download for Android
+                </a>
+              </>
+            )}
           </div>
           <p className="lp-meta">Android app · Installable web app · No account required</p>
 
@@ -330,6 +420,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
                   <span className="caret" />
                 </span>
               )}
+            </div>
+            <div className="lp-symbols" aria-hidden="true">
+              {['Tab', '{ }', '( )', '[ ]', ';', '"', "'", '<', '>', '=>', '/'].map(s => (
+                <span key={s}>{s}</span>
+              ))}
             </div>
             <div className="lp-window-foot">
               <span>codeforge-workspace / {snippet.tab}</span>
@@ -383,8 +478,55 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
         </div>
       </section>
 
+      {/* ---------- download ---------- */}
+      <section className="lp-section lp-download" id="download">
+        <div className="lp-wrap">
+          <div className="lp-section-head center lp-reveal">
+            <span className="lp-eyebrow">Get started</span>
+            <h2>
+              Take it with you, <em>or try it now.</em>
+            </h2>
+            <p>Install the Android app, add the web app to your home screen, or just open it in your browser.</p>
+          </div>
+          <div className="lp-tiles lp-reveal">
+            <div className="lp-tile featured">
+              <h3>Android app</h3>
+              <p>
+                The ready-to-install APK. When Android asks, allow &ldquo;Install unknown apps&rdquo; for your browser.
+              </p>
+              <a className="lp-btn lp-btn-primary lp-btn-sm" href={APK_URL} download rel="noreferrer">
+                <Download size={17} /> Download APK
+              </a>
+              <a className="lp-tile-link" href={RELEASES_URL} target="_blank" rel="noreferrer">
+                All releases
+              </a>
+            </div>
+            <div className="lp-tile">
+              <h3>Web app</h3>
+              <p>Install it to your home screen as a standalone app, or launch the IDE straight in your browser.</p>
+              <button className="lp-btn lp-btn-ghost lp-btn-sm" onClick={handleInstallClick}>
+                <Download size={17} /> Add to home screen
+              </button>
+              <button className="lp-tile-link" onClick={onLaunchIde}>
+                Or open the IDE now
+              </button>
+            </div>
+            <div className="lp-tile">
+              <h3>Project files</h3>
+              <p>Download your workspace as a .zip, or export the Capacitor setup to build the Android app yourself.</p>
+              <button className="lp-btn lp-btn-ghost lp-btn-sm" onClick={onDownloadZip}>
+                <Download size={17} /> Download .zip
+              </button>
+              <button className="lp-tile-link" onClick={onExportAndroid}>
+                Export Android config
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ---------- experience ---------- */}
-      <section className="lp-section" style={{ paddingTop: 0 }}>
+      <section className="lp-section">
         <div className="lp-wrap lp-split">
           <div className="lp-section-head lp-reveal">
             <span className="lp-eyebrow">Made for the phone</span>
@@ -433,53 +575,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
             Remote compilers are shared public services, so C, C++ and Java need an internet connection and may be
             rate limited at busy times.
           </p>
-        </div>
-      </section>
-
-      {/* ---------- download ---------- */}
-      <section className="lp-section lp-download" id="download">
-        <div className="lp-wrap">
-          <div className="lp-section-head center lp-reveal">
-            <span className="lp-eyebrow">Get started</span>
-            <h2>
-              Take it with you, <em>or try it now.</em>
-            </h2>
-            <p>Install the Android app, add the web app to your home screen, or just open it in your browser.</p>
-          </div>
-          <div className="lp-tiles lp-reveal">
-            <div className="lp-tile featured">
-              <h3>Android app</h3>
-              <p>
-                The ready-to-install APK. When Android asks, allow &ldquo;Install unknown apps&rdquo; for your browser.
-              </p>
-              <a className="lp-btn lp-btn-primary lp-btn-sm" href={APK_URL} download rel="noreferrer">
-                <Download size={17} /> Download APK
-              </a>
-              <a className="lp-tile-link" href={RELEASES_URL} target="_blank" rel="noreferrer">
-                All releases
-              </a>
-            </div>
-            <div className="lp-tile">
-              <h3>Web app</h3>
-              <p>Install it to your home screen as a standalone app, or launch the IDE straight in your browser.</p>
-              <button className="lp-btn lp-btn-ghost lp-btn-sm" onClick={handleInstallClick}>
-                <Download size={17} /> Add to home screen
-              </button>
-              <button className="lp-tile-link" onClick={onLaunchIde}>
-                Or open the IDE now
-              </button>
-            </div>
-            <div className="lp-tile">
-              <h3>Project files</h3>
-              <p>Download your workspace as a .zip, or export the Capacitor setup to build the Android app yourself.</p>
-              <button className="lp-btn lp-btn-ghost lp-btn-sm" onClick={onDownloadZip}>
-                <Download size={17} /> Download .zip
-              </button>
-              <button className="lp-tile-link" onClick={onExportAndroid}>
-                Export Android config
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -596,6 +691,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
         </div>
       </footer>
 
+      {/* Sticky action bar for phones: always one tap from the main actions */}
+      <div className={`lp-dock ${showDock && !showInstallModal ? 'show' : ''}`} aria-hidden={!showDock}>
+        <button className="lp-btn lp-btn-ghost" onClick={onLaunchIde} tabIndex={showDock ? 0 : -1}>
+          <Play size={17} /> Launch IDE
+        </button>
+        {platform === 'ios' ? (
+          <button className="lp-btn lp-btn-primary" onClick={handleInstallClick} tabIndex={showDock ? 0 : -1}>
+            <Download size={17} /> Add to Home
+          </button>
+        ) : (
+          <a className="lp-btn lp-btn-primary" href={APK_URL} download rel="noreferrer" tabIndex={showDock ? 0 : -1}>
+            <Download size={17} /> Get Android APK
+          </a>
+        )}
+      </div>
+
       {showTop && (
         <button
           className="lp-top"
@@ -616,26 +727,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
                 <X size={18} />
               </button>
             </div>
-            <div className="lp-step">
-              <span className="n">1</span>
-              <div>
-                <b>Android APK</b>
-                <p>Download the APK from GitHub Releases and open it on your Android phone.</p>
+            {platform !== 'ios' && (
+              <div className="lp-step">
+                <span className="n">1</span>
+                <div>
+                  <b>Android APK</b>
+                  <p>Download the APK from GitHub Releases and open it on your Android phone.</p>
+                </div>
               </div>
-            </div>
+            )}
             <div className="lp-step">
-              <span className="n">2</span>
+              <span className="n">{platform === 'ios' ? 1 : 2}</span>
               <div>
                 <b>Web app, no download</b>
                 <p>
-                  In Chrome, open the browser menu and choose &ldquo;Add to Home screen&rdquo; (&ldquo;Install app&rdquo; on some devices).
+                  {platform === 'ios'
+                    ? 'In Safari, tap the Share button, then choose \u201cAdd to Home Screen\u201d.'
+                    : 'In Chrome, open the browser menu and choose \u201cAdd to Home screen\u201d (\u201cInstall app\u201d on some devices).'}
                 </p>
               </div>
             </div>
             <div className="lp-modal-actions">
-              <a className="lp-btn lp-btn-primary lp-btn-sm" href={APK_URL} download rel="noreferrer">
-                <Download size={17} /> Download Android APK
-              </a>
+              {platform !== 'ios' && (
+                <a className="lp-btn lp-btn-primary lp-btn-sm" href={APK_URL} download rel="noreferrer">
+                  <Download size={17} /> Download Android APK
+                </a>
+              )}
               <div className="row">
                 <button
                   className="lp-btn lp-btn-ghost lp-btn-sm"

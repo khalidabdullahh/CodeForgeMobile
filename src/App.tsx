@@ -3293,7 +3293,7 @@ if 'matplotlib.pyplot' in sys.modules:
     const original = meta.getAttribute('content') || 'width=device-width, initial-scale=1.0';
     const apply = () => {
       const deviceWidth = window.screen.width || window.innerWidth;
-      const next = inIdeMode && deviceWidth < 820 ? 'width=820, user-scalable=no' : original;
+      const next = inIdeMode ? (deviceWidth < 820 ? 'width=820, user-scalable=no' : `${original}, maximum-scale=1.0, user-scalable=no`) : original;
       if (meta.getAttribute('content') !== next) meta.setAttribute('content', next);
     };
     apply();

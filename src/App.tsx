@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { saveFile } from './utils/saveFile';
+import { tsToJs, jsModulesToCjs, buildPreviewHtml } from './utils/transpile';
 import { runNative, needsInput, type NativeLang } from './utils/remoteRunner';
 import { runShell, type ShellAction, type ShellHost, type ShellSession } from './utils/shell';
 
@@ -1754,7 +1755,7 @@ function App() {
           const script = document.createElement('script');
           script.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js';
           script.onload = resolve;
-          script.onerror = reject;
+          script.onerror = () => reject(new Error('Could not download the Python runtime. Check your internet connection and try again.'));
           document.head.appendChild(script);
         });
       }
@@ -1793,6 +1794,8 @@ function App() {
       return pyodide;
     })();
 
+    // a failed download must not be cached, otherwise Python stays broken until a page reload
+    (window as any).pyodideLoadingPromise.catch(() => { (window as any).pyodideLoadingPromise = null; });
     return (window as any).pyodideLoadingPromise;
   };
 
@@ -1913,50 +1916,49 @@ if 'matplotlib.pyplot' in sys.modules:
     }
   };
 
-  const runJavaScriptCode = (code: string, fileName?: string) => {
+  const runJavaScriptCode = async (code: string, fileName?: string): Promise<number> => {
     setPanel(true);
     const targetName = fileName || active?.name || 'script.js';
-    setTerminal(prev => `${prev}\n$ node ${targetName}\n⏳ Executing JavaScript...`);
+    const isTs = /\.tsx?$/i.test(targetName);
+    setTerminal(prev => `${prev}\n$ ${isTs ? 'ts-node' : 'node'} ${targetName}\n⏳ Executing ${isTs ? 'TypeScript' : 'JavaScript'}...`);
+
+    const fmt = (a: any): string => {
+      if (typeof a === 'string') return a;
+      if (a instanceof Error) return a.stack || a.message;
+      if (typeof a === 'undefined') return 'undefined';
+      if (typeof a === 'function') return String(a);
+      if (typeof a === 'object' && a !== null) {
+        try { return JSON.stringify(a, null, 2); } catch { return String(a); }
+      }
+      return String(a);
+    };
+    const line = (prefix: string) => (...args: any[]) => setTerminal(prev => `${prev}\n${prefix}${args.map(fmt).join(' ')}`);
+    const customConsole = {
+      log: line(''),
+      debug: line(''),
+      warn: line('⚠️ '),
+      error: line('🔴 '),
+      info: line('ℹ️ '),
+      table: (data: any) => setTerminal(prev => `${prev}\n${fmt(data)}`)
+    };
 
     try {
-      const customConsole = {
-        log: (...args: any[]) => {
-          const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ');
-          setTerminal(prev => `${prev}\n${msg}`);
-        },
-        warn: (...args: any[]) => {
-          const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ');
-          setTerminal(prev => `${prev}\n⚠️ ${msg}`);
-        },
-        error: (...args: any[]) => {
-          const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ');
-          setTerminal(prev => `${prev}\n🔴 ${msg}`);
-        },
-        table: (data: any) => {
-          try {
-            setTerminal(prev => `${prev}\n${JSON.stringify(data, null, 2)}`);
-          } catch {
-            setTerminal(prev => `${prev}\n${String(data)}`);
-          }
-        },
-        info: (...args: any[]) => {
-          const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ');
-          setTerminal(prev => `${prev}\nℹ️ ${msg}`);
-        }
+      let source = code;
+      if (isTs) source = tsToJs(source);
+      else source = jsModulesToCjs(source);
+      const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+      const exportsObj: Record<string, unknown> = {};
+      const moduleObj = { exports: exportsObj };
+      const requireStub = (name: string) => {
+        throw new Error(`require('${name}') is not available in the browser runner`);
       };
-
-      const runner = new Function('console', 'prompt', 'alert', `
-        try {
-          ${code}
-        } catch (e) {
-          console.error(e.message || String(e));
-        }
-      `);
-
-      runner(customConsole, window.prompt.bind(window), window.alert.bind(window));
+      const runner = new AsyncFunction('console', 'prompt', 'alert', 'exports', 'module', 'require', source);
+      await runner(customConsole, window.prompt.bind(window), window.alert.bind(window), exportsObj, moduleObj, requireStub);
       setTerminal(prev => `${prev}\n✓ Process completed.`);
+      return 0;
     } catch (err: any) {
-      setTerminal(prev => `${prev}\n🔴 Syntax/Runtime Error: ${err.message || String(err)}`);
+      setTerminal(prev => `${prev}\n🔴 ${err && err.name && err.name !== 'Error' ? err.name + ': ' : ''}${err && err.message ? err.message : String(err)}\n🔴 Process exited with code 1`);
+      return 1;
     }
   };
 
@@ -2142,8 +2144,7 @@ if 'matplotlib.pyplot' in sys.modules:
             await runPythonCode(a.content, a.name);
             return 0;
           case 'run-node':
-            runJavaScriptCode(a.content, a.name);
-            return 0;
+            return runJavaScriptCode(a.content, a.name);
           case 'native-compile':
             return runNativeProgram(a.lang, a.content, { compileOnly: true });
           case 'native-run':
@@ -3322,51 +3323,8 @@ if 'matplotlib.pyplot' in sys.modules:
     : (files.find(f => f.name === 'index.html' || f.path.endsWith('index.html')) || files.find(f => f.language === 'html' || f.name.endsWith('.html')));
   const rawHtml = htmlFile ? htmlFile.content : '<h1>No HTML file selected</h1><p>Open or create an .html file to preview.</p>';
 
-  const sanitizePreviewHtml = (rawDoc: string) => {
-    try {
-      const parsed = new DOMParser().parseFromString(rawDoc, 'text/html');
-      parsed.querySelectorAll('script, link').forEach(node => node.remove());
-      return parsed.body.innerHTML || rawDoc;
-    } catch {
-      return rawDoc;
-    }
-  };
-
-  // Collect all CSS and all JS
-  const cssFiles = files.filter(f => f.language === 'css' || f.name.endsWith('.css'));
-  const jsFiles = files.filter(f => (f.language === 'javascript' || f.name.endsWith('.js')) && !f.name.endsWith('.json'));
-  const css = cssFiles.map(f => `/* === ${f.path} === */\n${f.content}`).join('\n\n');
-  const js = jsFiles.map(f => `/* === ${f.path} === */\n${f.content}`).join('\n\n');
-
-  const preview = `<!doctype html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>${css}</style>
-  <script>
-    (function() {
-      const _log = console.log;
-      const _warn = console.warn;
-      const _err = console.error;
-      function send(type, args) {
-        try {
-          const msg = Array.from(args).map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-          window.parent.postMessage({ type: 'codeforge-console', level: type, message: msg }, '*');
-        } catch (e) {}
-      }
-      console.log = function() { send('log', arguments); _log.apply(console, arguments); };
-      console.warn = function() { send('warn', arguments); _warn.apply(console, arguments); };
-      console.error = function() { send('error', arguments); _err.apply(console, arguments); };
-      window.onerror = function(msg, url, line) { send('error', [msg + ' (line ' + line + ')']); };
-    })();
-  </script>
-</head>
-<body>
-  ${sanitizePreviewHtml(rawHtml)}
-  <script>${js}</script>
-</body>
-</html>`;
+  const PREVIEW_CONSOLE_BRIDGE = "(function(){var _l=console.log,_w=console.warn,_e=console.error;function send(t,a){try{var m=Array.from(a).map(function(x){try{return typeof x==='object'?JSON.stringify(x):String(x)}catch(_){return String(x)}}).join(' ');window.parent.postMessage({type:'codeforge-console',level:t,message:m},'*')}catch(e){}}console.log=function(){send('log',arguments);_l.apply(console,arguments)};console.warn=function(){send('warn',arguments);_w.apply(console,arguments)};console.error=function(){send('error',arguments);_e.apply(console,arguments)};window.addEventListener('error',function(ev){send('error',[(ev.message||'Error')+(ev.lineno?' (line '+ev.lineno+')':'')])});window.addEventListener('unhandledrejection',function(ev){send('error',['Unhandled promise rejection: '+(ev.reason&&ev.reason.message||ev.reason)])})})();";
+  const preview = buildPreviewHtml(rawHtml, files, PREVIEW_CONSOLE_BRIDGE);
 
   return (
     <div className={`app-shell theme-${theme}`} style={{ background: themeBgMap[theme] }}>
@@ -3400,9 +3358,6 @@ if 'matplotlib.pyplot' in sys.modules:
             <Menu size={19} />
           </button>
           <div className="brand">
-            <div className="brand-mark">
-              <img src="./icon-192.png" alt="CodeForge logo" width={30} height={30} />
-            </div>
             <span>CodeForge</span>
             <small>Mobile IDE</small>
           </div>

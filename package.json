@@ -21,7 +21,8 @@
     "jszip": "^3.10.2",
     "lucide-react": "^0.469.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "sucrase": "^3.35.1"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.0.0"

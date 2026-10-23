@@ -20,12 +20,14 @@ export interface RunResult {
 
 const endpoints = {
   judge0: 'https://ce.judge0.com',
+  wandbox: 'https://wandbox.org/api',
   piston: 'https://emkc.org/api/v2/piston'
 };
 /** only used by tests */
 export function __setEndpoints(e: Partial<typeof endpoints>) {
   Object.assign(endpoints, e);
   languageCache = null;
+  wandboxCache = null;
 }
 
 interface HttpResult {
@@ -172,6 +174,47 @@ async function runJudge0(lang: NativeLang, source: string, stdin: string): Promi
   return { ok: statusId === 3 && (exitCode === 0 || exitCode === null), stdout, stderr: stderr + extra, exitCode, timeSec, provider: 'Judge0' };
 }
 
+// --------------------------------------------------------------- Wandbox ----
+let wandboxCache: { name: string; language: string }[] | null = null;
+
+async function wandboxCompiler(lang: NativeLang): Promise<string> {
+  const fallback = { c: 'gcc-head-c', cpp: 'gcc-head', java: 'openjdk-jdk-22+36' }[lang];
+  try {
+    if (!wandboxCache) {
+      const res = await http('GET', `${endpoints.wandbox}/list.json`, undefined, 15000);
+      if (res.status === 200 && Array.isArray(res.json)) wandboxCache = res.json;
+    }
+    const language = { c: 'C', cpp: 'C++', java: 'Java' }[lang];
+    const list = (wandboxCache || []).filter(c => c.language === language);
+    const prefer = lang === 'java' ? /^openjdk/ : lang === 'c' ? /^gcc-.*c$|^gcc-head-c$/ : /^gcc-/;
+    const pick = list.find(c => c.name === fallback) || list.find(c => prefer.test(c.name));
+    if (pick) return pick.name;
+  } catch {
+    /* use the well-known name */
+  }
+  return fallback;
+}
+
+async function runWandbox(lang: NativeLang, source: string, stdin: string): Promise<RunResult> {
+  const body: Record<string, unknown> = {
+    code: source,
+    compiler: await wandboxCompiler(lang),
+    stdin,
+    save: false
+  };
+  if (lang === 'cpp') body['compiler-option-raw'] = '-std=c++17\n-O2';
+  const res = await http('POST', `${endpoints.wandbox}/compile.json`, body, 40000);
+  const r = res.json;
+  if (res.status !== 200 || !r || typeof r !== 'object') throw new Error(`Wandbox returned HTTP ${res.status}`);
+  const stdout: string = r.program_output || '';
+  const stderr: string = r.program_error || '';
+  const status = r.status === undefined || r.status === null ? null : Number(r.status);
+  if (r.compiler_error && !stdout && !stderr && status !== 0) {
+    return { ok: false, compileError: r.compiler_error, stdout: '', stderr: '', exitCode: null, provider: 'Wandbox' };
+  }
+  return { ok: status === 0, stdout, stderr, exitCode: status, provider: 'Wandbox' };
+}
+
 // ---------------------------------------------------------------- Piston ----
 async function runPiston(lang: NativeLang, source: string, stdin: string): Promise<RunResult> {
   const fileName = lang === 'java' ? 'Main.java' : lang === 'c' ? 'main.c' : 'main.cpp';
@@ -205,7 +248,7 @@ export async function runNative(opts: { lang: NativeLang; source: string; stdin?
   const stdin = opts.stdin || '';
 
   const errors: string[] = [];
-  for (const provider of [runJudge0, runPiston]) {
+  for (const provider of [runJudge0, runWandbox, runPiston]) {
     try {
       const result = await provider(opts.lang, source, stdin);
       return note ? { ...result, note } : result;

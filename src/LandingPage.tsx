@@ -6,6 +6,7 @@ import {
   Code2,
   Columns,
   Download,
+  ExternalLink,
   Film,
   FolderGit2,
   Github,
@@ -414,6 +415,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="#features">Features</a>
             <a href="#landscape">VS Code Vibe</a>
             <a href="#download">Download</a>
+            <a href="#author">Creator</a>
             <a href="#community">Community</a>
           </div>
 
@@ -742,6 +744,39 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button className="tile-btn secondary" onClick={onExportAndroid}>
                 <Download size={15} /> Export Android Config
               </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Author & Owner Section */}
+      <section id="author" className="author-section reveal-on-scroll">
+        <div className="author-card">
+          <img
+            className="author-avatar"
+            src="https://github.com/khalidabdullahh.png?size=240"
+            alt="Khalid Abdullah"
+            width={96}
+            height={96}
+            loading="lazy"
+          />
+          <div className="author-body">
+            <span className="author-role">Author &amp; Owner</span>
+            <h2>Khalid Abdullah</h2>
+            <p className="author-bio">
+              Computer Science student from Bangladesh with a curiosity for technology, mathematics and problem
+              solving. I built CodeForge Mobile so anyone with just a phone can learn and write real code.
+            </p>
+            <div className="author-links">
+              <a href="https://github.com/khalidabdullahh" target="_blank" rel="noreferrer">
+                <Github size={16} /> GitHub
+              </a>
+              <a href="https://khalidslab.pages.dev" target="_blank" rel="noreferrer">
+                <Globe size={16} /> Portfolio
+              </a>
+              <a href="https://x.com/voiceoffkhalid" target="_blank" rel="noreferrer">
+                <ExternalLink size={16} /> @voiceoffkhalid
+              </a>
             </div>
           </div>
         </div>

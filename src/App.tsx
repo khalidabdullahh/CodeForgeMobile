@@ -93,6 +93,11 @@ export type FileItem = { id: string; name: string; path: string; language: strin
 type Extension = { id: string; name: string; description: string; installed: boolean };
 type View = 'editor' | 'preview' | 'extensions' | 'git' | 'settings' | 'ai' | 'templates' | 'github-sync' | 'liveshare' | 'stykanime';
 export type SidebarTab = 'explorer' | 'search' | 'git' | 'debug' | 'ai' | 'extensions' | 'settings';
+interface BranchState {
+  files: FileItem[];
+  history: string[];
+}
+
 type ThemeName = 'codeforge' | 'vs-dark' | 'light' | 'dracula' | 'one-dark-pro' | 'monokai' | 'synthwave-84';
 type AiProvider = 'gemini' | 'openai';
 
@@ -770,8 +775,24 @@ function App() {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
   const [diffTarget, setDiffTarget] = useState<FileItem | null>(null);
   const [diffSideBySide, setDiffSideBySide] = useState(false);
+  // Real local branches: each branch keeps its own committed files + history (persisted on the device)
+  const [branchStore, setBranchStore] = useState<Record<string, BranchState>>(() => {
+    try {
+      const saved = JSON.parse(safeGet('codeforge-branches') || 'null');
+      if (saved && typeof saved === 'object' && !Array.isArray(saved)) return saved;
+    } catch { /* ignore corrupt data */ }
+    return {};
+  });
   const [savedSnapshots, setSavedSnapshots] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
+    try {
+      const store = JSON.parse(safeGet('codeforge-branches') || 'null');
+      const current = safeGet('codeforge-branch') || 'main';
+      if (store && store[current] && Array.isArray(store[current].files)) {
+        store[current].files.forEach((f: FileItem) => { map[f.id] = f.content; });
+        return map;
+      }
+    } catch { /* fall through to the starter snapshot */ }
     defaultStarterFiles.forEach(f => { map[f.id] = f.content; });
     return map;
   });
@@ -800,15 +821,18 @@ function App() {
     }
   });
   const [gitMessage, setGitMessage] = useState('Update workspace');
+  const [branch, setBranch] = useState(() => safeGet('codeforge-branch') || 'main');
   const [gitHistory, setGitHistory] = useState<string[]>(() => {
     try {
+      const store = JSON.parse(safeGet('codeforge-branches') || 'null');
+      const current = safeGet('codeforge-branch') || 'main';
+      if (store && store[current] && Array.isArray(store[current].history) && store[current].history.length) return store[current].history;
       const saved = JSON.parse(safeGet('codeforge-git') || 'null');
       return Array.isArray(saved) && saved.length ? saved : ['Initial workspace snapshot'];
     } catch {
       return ['Initial workspace snapshot'];
     }
   });
-  const [branch, setBranch] = useState('main');
   const [previewKey, setPreviewKey] = useState(0);
   const [splitPreview, setSplitPreview] = useState(false);
   const [palette, setPalette] = useState(false);
@@ -854,6 +878,7 @@ function App() {
     }
   });
   const [ghRepoInput, setGhRepoInput] = useState(() => safeGet('codeforge-gh-repo') || 'khalidabdullahh/CodeForgeMobile');
+  const [ghBranch, setGhBranch] = useState(() => safeGet('codeforge-gh-branch') || 'main');
   const [ghLoading, setGhLoading] = useState(false);
   const [ghStatusMsg, setGhStatusMsg] = useState('');
 
@@ -1054,6 +1079,16 @@ function App() {
 
   useEffect(() => { safeSet('codeforge-files', JSON.stringify(files)); }, [files]);
   useEffect(() => { safeSet('codeforge-git', JSON.stringify(gitHistory)); }, [gitHistory]);
+  useEffect(() => { safeSet('codeforge-branch', branch); }, [branch]);
+  useEffect(() => { safeSet('codeforge-gh-branch', ghBranch); }, [ghBranch]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('codeforge-branches', JSON.stringify(branchStore));
+    } catch {
+      // storage full: the workspace itself still works, only commit history is at risk
+      console.warn('CodeForge: could not persist commit history (storage full)');
+    }
+  }, [branchStore]);
   useEffect(() => { safeSet('codeforge-extensions', JSON.stringify(extensions)); }, [extensions]);
   useEffect(() => { safeSet('codeforge-font', String(fontSize)); }, [fontSize]);
   useEffect(() => { safeSet('codeforge-theme', theme); }, [theme]);
@@ -2204,9 +2239,7 @@ if 'matplotlib.pyplot' in sys.modules:
             deferred.push(() => commitWithMessage(a.message));
             return 0;
           case 'git-branch':
-            setBranch(a.name);
-            termPrint(`✓ Switched to branch '${a.name}' (branch names are labels in this workspace; history is shared)`);
-            return 0;
+            return switchBranch(a.name, { create: a.create, stay: a.stay }) ? 0 : 1;
           default:
             return 1;
         }
@@ -2219,7 +2252,7 @@ if 'matplotlib.pyplot' in sys.modules:
         {
           files: inputMap,
           session: shellSessionRef.current,
-          git: { branch, modified: startFiles.filter(f => f.modified).map(f => f.path), log: gitHistory, snapshots },
+          git: { branch, branches: branchNames, modified: startFiles.filter(f => f.modified).map(f => f.path), log: gitHistory, snapshots },
           history: cmdHistory
         },
         host
@@ -2282,201 +2315,369 @@ if 'matplotlib.pyplot' in sys.modules:
     setTerminal(prev => `${prev}\n✓ Discarded all uncommitted changes in workspace`);
   };
 
-  const commitWithMessage = (rawMessage: string) => {
-    const message = rawMessage.trim();
-    if (!message) return;
-    setGitHistory(prev => [message, ...prev]);
-    setSavedSnapshots(prev => {
-      const next = { ...prev };
-      files.forEach(f => { next[f.id] = f.content; });
+  // files as they were at the last commit of a branch
+  const committedFilesOf = (name: string): FileItem[] => {
+    const stored = branchStore[name];
+    if (stored) return stored.files;
+    return files
+      .filter(f => savedSnapshots[f.id] !== undefined)
+      .map(f => ({ ...f, content: savedSnapshots[f.id], modified: false }));
+  };
+
+  const isWorkingTreeDirty = (): boolean => {
+    const committed = committedFilesOf(branch);
+    if (files.some(f => f.modified)) return true;
+    if (committed.length !== files.length) return true;
+    const byId = new Map(committed.map(f => [f.id, f] as [string, FileItem]));
+    return files.some(f => {
+      const c = byId.get(f.id);
+      return !c || c.content !== f.content || c.path !== f.path;
+    });
+  };
+
+  const branchNames = Array.from(new Set(['main', ...Object.keys(branchStore), branch]));
+
+  const makeCommitId = (message: string) => {
+    let h = 5381;
+    const seed = `${message}|${Date.now()}|${Math.random()}`;
+    for (let i = 0; i < seed.length; i++) h = ((h << 5) + h + seed.charCodeAt(i)) >>> 0;
+    return h.toString(16).padStart(8, '0').slice(0, 7);
+  };
+
+  // Records the current workspace as a new commit on the current branch
+  const recordCommit = (message: string, sourceFiles: FileItem[]) => {
+    const committed = sourceFiles.map(f => ({ ...f, modified: false }));
+    const nextHistory = [`${makeCommitId(message)} ${message}`, ...gitHistory];
+    setGitHistory(nextHistory);
+    setBranchStore(prev => ({ ...prev, [branch]: { files: committed, history: nextHistory } }));
+    setSavedSnapshots(() => {
+      const next: Record<string, string> = {};
+      committed.forEach(f => { next[f.id] = f.content; });
       return next;
     });
     setFiles(prev => prev.map(f => ({ ...f, modified: false })));
+  };
+
+  const commitWithMessage = (rawMessage: string): boolean => {
+    const message = rawMessage.trim();
+    if (!message) return false;
+    if (!isWorkingTreeDirty() && gitHistory.length > 0) {
+      setTerminal(prev => `${prev}\n✓ [${branch}] nothing to commit, working tree clean`);
+      return false;
+    }
+    recordCommit(message, files);
     setTerminal(prev => `${prev}\n✓ [${branch}] committed: ${message}`);
+    return true;
   };
 
   const commit = () => {
-    commitWithMessage(gitMessage);
-    setGitMessage('');
+    if (commitWithMessage(gitMessage)) setGitMessage('');
   };
 
-  const checkout = (next: string) => {
-    setBranch(next);
-    setTerminal(prev => `${prev}\n✓ Switched to branch ${next}`);
+  // git checkout / switch / branch: each branch has its own committed files and history
+  const switchBranch = (rawName: string, opts: { create?: boolean; stay?: boolean } = {}): boolean => {
+    const name = rawName.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9._\/-]{0,59}$/.test(name) || name.includes('..') || name.endsWith('/') || name.endsWith('.lock')) {
+      setTerminal(prev => `${prev}\n🔴 fatal: '${name}' is not a valid branch name`);
+      return false;
+    }
+    const exists = name === branch || !!branchStore[name] || (name === 'main' && !branchStore.main);
+    if (name === branch) {
+      setTerminal(prev => `${prev}\n✓ Already on '${name}'`);
+      return true;
+    }
+    if (!exists && !opts.create) {
+      setTerminal(prev => `${prev}\n🔴 error: branch '${name}' not found. Create it with: git checkout -b ${name}`);
+      return false;
+    }
+    if (exists && opts.create) {
+      setTerminal(prev => `${prev}\n🔴 fatal: a branch named '${name}' already exists`);
+      return false;
+    }
+    const currentCommitted = committedFilesOf(branch);
+    const currentState: BranchState = branchStore[branch] || { files: currentCommitted, history: gitHistory };
+
+    // creating a branch without switching ("git branch name") never touches the working tree
+    if (opts.stay) {
+      setBranchStore(prev => ({ ...prev, [branch]: prev[branch] || currentState, [name]: { files: currentState.files, history: currentState.history } }));
+      setTerminal(prev => `${prev}\n✓ Created branch '${name}' at ${branch}`);
+      return true;
+    }
+    if (isWorkingTreeDirty()) {
+      setTerminal(prev => `${prev}\n🔴 error: you have uncommitted changes. Commit or discard them before switching to '${name}'.`);
+      return false;
+    }
+    const target: BranchState = branchStore[name] || (name === 'main' ? currentState : { files: currentState.files, history: currentState.history });
+    const nextFiles = target.files.map(f => ({ ...f, modified: false }));
+    setBranchStore(prev => ({ ...prev, [branch]: prev[branch] || currentState, [name]: prev[name] || target }));
+    setFiles(nextFiles);
+    setSavedSnapshots(() => {
+      const snap: Record<string, string> = {};
+      nextFiles.forEach(f => { snap[f.id] = f.content; });
+      return snap;
+    });
+    setGitHistory(target.history.length ? target.history : ['Initial workspace snapshot']);
+    setBranch(name);
+    if (nextFiles.length) {
+      const ids = new Set(nextFiles.map(f => f.id));
+      setOpenTabs(prev => {
+        const kept = prev.filter(id => ids.has(id));
+        return kept.length ? kept : [nextFiles[0].id];
+      });
+      setActiveId(prev => (ids.has(prev) ? prev : nextFiles[0].id));
+    }
+    setTerminal(prev => `${prev}\n✓ ${opts.create ? `Switched to a new branch '${name}'` : `Switched to branch '${name}'`}`);
+    return true;
   };
 
-  // Real GitHub Cloud Sync (PAT)
-  const pushFileToGitHub = async () => {
+  const createBranchPrompt = () => {
+    const name = window.prompt('New branch name (e.g. feature-login)');
+    if (name && name.trim()) switchBranch(name, { create: true });
+  };
+
+  // ---------------------------------------------------------------- GitHub sync
+  // Uses the GitHub REST "Git Data" API, so a push is ONE commit (not one per file) and can create the branch.
+  class GitHubError extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.status = status;
+    }
+  }
+
+  const ghRequest = async (path: string, init: RequestInit = {}) => {
+    const res = await fetch(`https://api.github.com${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${ghToken.trim()}`,
+        Accept: 'application/vnd.github+json',
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.headers || {})
+      }
+    });
+    let data: any = null;
+    try { data = await res.json(); } catch { /* empty body */ }
+    if (!res.ok) {
+      const remaining = res.headers.get('x-ratelimit-remaining');
+      let msg = (data && data.message) || `GitHub returned HTTP ${res.status}`;
+      if (res.status === 401) msg = 'Bad credentials: the token is wrong or expired.';
+      else if (res.status === 403 && remaining === '0') msg = 'GitHub rate limit reached. Try again in a few minutes.';
+      else if (res.status === 403) msg = `${msg} (the token needs Contents: Read & Write for this repository)`;
+      else if (res.status === 404) msg = `${msg}. Check the repository name and that the token can access it.`;
+      throw new GitHubError(msg, res.status);
+    }
+    return data;
+  };
+
+  const parseRepoInput = (): { owner: string; repo: string } | null => {
+    const m = ghRepoInput.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/+$/, '').split('/');
+    if (m.length !== 2 || !m[0] || !m[1]) return null;
+    return { owner: encodeURIComponent(m[0]), repo: encodeURIComponent(m[1]) };
+  };
+
+  const toBase64 = (text: string) => {
+    const bytes = new TextEncoder().encode(text);
+    let bin = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    return btoa(bin);
+  };
+
+  const runPool = async <T,>(items: T[], size: number, worker: (item: T) => Promise<void>) => {
+    let next = 0;
+    const lanes = Array.from({ length: Math.min(size, items.length) }, async () => {
+      while (next < items.length) {
+        const item = items[next++];
+        await worker(item);
+      }
+    });
+    await Promise.all(lanes);
+  };
+
+  const ghPreflight = (): { owner: string; repo: string; target: string } | null => {
     if (!ghToken.trim()) {
       setGhStatusMsg('⚠️ Please enter your GitHub Personal Access Token.');
-      return;
+      return null;
     }
-    const [owner, repo] = ghRepoInput.split('/');
-    if (!owner || !repo) {
-      setGhStatusMsg('⚠️ Please specify repository in format owner/repo (e.g. username/repo).');
-      return;
+    const parsed = parseRepoInput();
+    if (!parsed) {
+      setGhStatusMsg('⚠️ Please specify the repository as owner/repo (e.g. username/repo).');
+      return null;
     }
-    setGhLoading(true);
-    setGhStatusMsg('⏳ Pushing files directly to GitHub...');
-    try {
-      let sha: string | undefined;
-      const encodedOwner = encodeURIComponent(owner.trim());
-      const encodedRepo = encodeURIComponent(repo.trim());
-      const encodedPath = active.path.split('/').map(encodeURIComponent).join('/');
-      const encodedBranch = encodeURIComponent(branch.trim());
-
-      // Check existing SHA
-      const getRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${encodedPath}?ref=${encodedBranch}`, {
-        headers: {
-          Authorization: `token ${ghToken.trim()}`,
-          Accept: 'application/vnd.github.v3+json'
-        }
-      });
-      if (getRes.ok) {
-        const data = await getRes.json();
-        sha = data.sha;
-      }
-      // Put content
-      const putRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${encodedPath}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `token ${ghToken.trim()}`,
-          Accept: 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: gitMessage || `Update ${active.path} via CodeForge Mobile`,
-          content: btoa(unescape(encodeURIComponent(active.content))),
-          branch: branch.trim(),
-          sha
-        })
-      });
-      if (!putRes.ok) {
-        const err = await putRes.json();
-        throw new Error(err.message || 'GitHub API rejected commit');
-      }
-      setGhStatusMsg(`✅ Successfully pushed ${active.path} to GitHub (${owner}/${repo})!`);
-      setTerminal(prev => `${prev}\n✓ Pushed ${active.path} to GitHub (${owner}/${repo}) on branch ${branch}`);
-    } catch (err: any) {
-      setGhStatusMsg(`❌ Error: ${err.message}`);
-    } finally {
-      setGhLoading(false);
+    const target = ghBranch.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9._\/-]{0,99}$/.test(target) || target.includes('..')) {
+      setGhStatusMsg('⚠️ Please enter a valid branch name (e.g. main).');
+      return null;
     }
+    return { ...parsed, target };
   };
 
-  // Push entire workspace (sequential content API – good for small projects)
-  const pushAllToGitHub = async () => {
-    if (!ghToken.trim()) {
-      setGhStatusMsg('⚠️ Please enter your GitHub Personal Access Token.');
+  // Commits the given files to the remote branch as a single commit
+  const pushFilesToGitHub = async (subset: FileItem[], label: string) => {
+    const pre = ghPreflight();
+    if (!pre) return;
+    if (!subset.length) {
+      setGhStatusMsg('⚠️ There are no files to push.');
       return;
     }
-    const [owner, repo] = ghRepoInput.split('/');
-    if (!owner || !repo) {
-      setGhStatusMsg('⚠️ Please specify repository in format owner/repo.');
-      return;
-    }
+    const { owner, repo, target } = pre;
+    const base = `/repos/${owner}/${repo}`;
+    const encodedTarget = target.split('/').map(encodeURIComponent).join('/');
+    const display = `${decodeURIComponent(owner)}/${decodeURIComponent(repo)}`;
     setGhLoading(true);
-    setGhStatusMsg(`⏳ Pushing all ${files.length} files to GitHub...`);
-    const encodedOwner = encodeURIComponent(owner.trim());
-    const encodedRepo = encodeURIComponent(repo.trim());
-    let success = 0;
-    let failed = 0;
+    setGhStatusMsg(`⏳ Pushing ${label} to GitHub...`);
     try {
-      for (const file of files) {
+      const repoInfo = await ghRequest(base);
+      if (repoInfo?.permissions && repoInfo.permissions.push === false) {
+        throw new Error('This token can only read the repository. Create one with Contents: Read & Write.');
+      }
+      const defaultBranch: string = repoInfo?.default_branch || 'main';
+      const message = (gitMessage || '').trim() || `Update ${subset.length === 1 ? subset[0].path : `${subset.length} files`} via CodeForge Mobile`;
+
+      const getRef = async (name: string) => {
         try {
-          let sha: string | undefined;
-          const encodedPath = file.path.split('/').map(encodeURIComponent).join('/');
-          const getRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${encodedPath}?ref=${encodeURIComponent(branch.trim())}`, {
-            headers: { Authorization: `token ${ghToken.trim()}`, Accept: 'application/vnd.github.v3+json' }
-          });
-          if (getRes.ok) {
-            const data = await getRes.json();
-            sha = data.sha;
-          }
-          const putRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${encodedPath}`, {
-            method: 'PUT',
-            headers: {
-              Authorization: `token ${ghToken.trim()}`,
-              Accept: 'application/vnd.github.v3+json',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              message: gitMessage || `Update ${file.path} via CodeForge Mobile`,
-              content: btoa(unescape(encodeURIComponent(file.content))),
-              branch: branch.trim(),
-              sha
-            })
-          });
-          if (putRes.ok) success++;
-          else failed++;
-        } catch {
-          failed++;
+          const r = await ghRequest(`${base}/git/ref/heads/${name.split('/').map(encodeURIComponent).join('/')}`);
+          return (r?.object?.sha as string) || null;
+        } catch (e: any) {
+          if (e instanceof GitHubError && (e.status === 404 || e.status === 409)) return null;
+          throw e;
         }
+      };
+
+      let headSha = await getRef(target);
+      let createdBranch = false;
+      if (!headSha) {
+        let defaultSha = await getRef(defaultBranch);
+        if (!defaultSha) {
+          // Brand-new empty repository: the Contents API creates the very first commit
+          const first = subset[0];
+          await ghRequest(`${base}/contents/${first.path.split('/').map(encodeURIComponent).join('/')}`, {
+            method: 'PUT',
+            body: JSON.stringify({ message: 'Initial commit via CodeForge Mobile', content: toBase64(first.content) })
+          });
+          defaultSha = await getRef(defaultBranch);
+          if (!defaultSha) throw new Error('Could not initialise the empty repository.');
+        }
+        if (target !== defaultBranch) {
+          await ghRequest(`${base}/git/refs`, { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${target}`, sha: defaultSha }) });
+          createdBranch = true;
+        }
+        headSha = defaultSha;
       }
-      setGhStatusMsg(`✅ Pushed ${success}/${files.length} files${failed ? ` (${failed} failed)` : ''} to ${owner}/${repo}`);
-      setTerminal(prev => `${prev}\n✓ GitHub push-all: ${success} ok, ${failed} failed`);
-      setFiles(prev => prev.map(f => ({ ...f, modified: false })));
+
+      const headCommit = await ghRequest(`${base}/git/commits/${headSha}`);
+      const baseTree: string = headCommit.tree.sha;
+
+      const entries: { path: string; mode: string; type: string; sha: string }[] = [];
+      await runPool(subset, 4, async f => {
+        const blob = await ghRequest(`${base}/git/blobs`, { method: 'POST', body: JSON.stringify({ content: toBase64(f.content), encoding: 'base64' }) });
+        entries.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha });
+      });
+      entries.sort((a, b) => a.path.localeCompare(b.path));
+
+      const tree = await ghRequest(`${base}/git/trees`, { method: 'POST', body: JSON.stringify({ base_tree: baseTree, tree: entries }) });
+      if (tree.sha === baseTree) {
+        setGhStatusMsg(`✅ Already up to date: ${display} (${target}) has the same content.`);
+        return;
+      }
+      const commitObj = await ghRequest(`${base}/git/commits`, { method: 'POST', body: JSON.stringify({ message, tree: tree.sha, parents: [headSha] }) });
+      await ghRequest(`${base}/git/refs/heads/${encodedTarget}`, { method: 'PATCH', body: JSON.stringify({ sha: commitObj.sha, force: false }) });
+
+      setGhStatusMsg(`✅ Pushed ${label} as 1 commit to ${display} on '${target}'${createdBranch ? ' (new branch created)' : ''}.`);
+      setTerminal(prev => `${prev}\n✓ GitHub push: ${label} -> ${display}@${target} (${String(commitObj.sha).slice(0, 7)})`);
     } catch (err: any) {
-      setGhStatusMsg(`❌ Error: ${err.message}`);
+      const hint = err instanceof GitHubError && err.status === 422 ? ' (the branch may have changed on GitHub; pull first)' : '';
+      setGhStatusMsg(`❌ ${err.message}${hint}`);
     } finally {
       setGhLoading(false);
     }
   };
 
-  // Pull files from GitHub repository (flat listing of root + common files)
+  const pushFileToGitHub = () => (active ? pushFilesToGitHub([active], active.path) : undefined);
+  const pushAllToGitHub = () => pushFilesToGitHub(files, `${files.length} file${files.length === 1 ? '' : 's'}`);
+
+  // Pull a repository into the workspace (binary-safe, includes dotfiles, falls back to the default branch)
   const pullFromGitHub = async () => {
-    if (!ghToken.trim()) {
-      setGhStatusMsg('⚠️ Please enter your GitHub Personal Access Token.');
-      return;
-    }
-    const [owner, repo] = ghRepoInput.split('/');
-    if (!owner || !repo) {
-      setGhStatusMsg('⚠️ Please specify repository in format owner/repo.');
-      return;
-    }
+    const pre = ghPreflight();
+    if (!pre) return;
+    const { owner, repo, target } = pre;
+    const base = `/repos/${owner}/${repo}`;
+    const display = `${decodeURIComponent(owner)}/${decodeURIComponent(repo)}`;
     setGhLoading(true);
-    setGhStatusMsg('⏳ Pulling repository contents from GitHub...');
+    setGhStatusMsg('⏳ Reading repository...');
     try {
-      const encodedOwner = encodeURIComponent(owner.trim());
-      const encodedRepo = encodeURIComponent(repo.trim());
-      const res = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/git/trees/${encodeURIComponent(branch.trim())}?recursive=1`, {
-        headers: { Authorization: `token ${ghToken.trim()}`, Accept: 'application/vnd.github.v3+json' }
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Failed to list tree');
-      }
-      const tree = await res.json();
-      const blobs = (tree.tree || []).filter((t: any) => t.type === 'blob' && t.path && !t.path.startsWith('.') && t.size < 500000);
-      if (!blobs.length) throw new Error('No files found in repository');
-      const normalized: FileItem[] = [];
-      // Limit to first 40 files to avoid rate limits / memory
-      for (const blob of blobs.slice(0, 40)) {
-        const contentRes = await fetch(`https://api.github.com/repos/${encodedOwner}/${encodedRepo}/contents/${blob.path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(branch.trim())}`, {
-          headers: { Authorization: `token ${ghToken.trim()}`, Accept: 'application/vnd.github.v3+json' }
-        });
-        if (!contentRes.ok) continue;
-        const data = await contentRes.json();
-        if (data.encoding === 'base64' && data.content) {
-          const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
-          const name = blob.path.split('/').pop() || blob.path;
-          normalized.push({
-            id: crypto.randomUUID(),
-            name,
-            path: blob.path,
-            language: languageFor(name),
-            content
-          });
+      const repoInfo = await ghRequest(base);
+      const defaultBranch: string = repoInfo?.default_branch || 'main';
+      let usedBranch = target;
+      let tree: any;
+      try {
+        tree = await ghRequest(`${base}/git/trees/${encodeURIComponent(usedBranch)}?recursive=1`);
+      } catch (e: any) {
+        if (e instanceof GitHubError && (e.status === 404 || e.status === 409) && usedBranch !== defaultBranch) {
+          usedBranch = defaultBranch;
+          tree = await ghRequest(`${base}/git/trees/${encodeURIComponent(usedBranch)}?recursive=1`);
+        } else if (e instanceof GitHubError && e.status === 409) {
+          throw new Error('This repository is empty, there is nothing to pull yet.');
+        } else {
+          throw e;
         }
       }
-      if (!normalized.length) throw new Error('Could not decode any files');
-      setFiles(normalized);
-      setOpenTabs([normalized[0].id]);
-      setActiveId(normalized[0].id);
-      setGhStatusMsg(`✅ Pulled ${normalized.length} files from ${owner}/${repo}`);
-      setTerminal(prev => `${prev}\n✓ GitHub pull: loaded ${normalized.length} files`);
+      const SKIP_DIR = /(^|\/)(\.git|node_modules|dist|build|\.next|\.cache|__pycache__)\//;
+      const BINARY_EXT = /\.(png|jpe?g|gif|webp|bmp|ico|icns|pdf|zip|gz|tar|7z|rar|jar|apk|aab|exe|dll|so|wasm|woff2?|ttf|otf|eot|mp3|wav|ogg|mp4|mov|webm|psd|sqlite|db|bin|class)$/i;
+      const all = (tree.tree || []).filter((n: any) => n.type === 'blob' && n.path && !SKIP_DIR.test(`${n.path}`));
+      const candidates = all.filter((n: any) => !BINARY_EXT.test(n.path) && (n.size ?? 0) < 1000000);
+      const skippedBinary = all.length - candidates.length;
+      const LIMIT = 80;
+      const picked = candidates.slice(0, LIMIT);
+      if (!picked.length) throw new Error('No text files found in this repository.');
+
+      const confirmed = window.confirm(
+        `Replace your current workspace (${files.length} file${files.length === 1 ? '' : 's'}) with ${picked.length} file${picked.length === 1 ? '' : 's'} from ${display}@${usedBranch}?\n\nUncommitted changes will be lost.`
+      );
+      if (!confirmed) {
+        setGhStatusMsg('Pull cancelled. Your workspace was not changed.');
+        return;
+      }
+      setGhStatusMsg(`⏳ Downloading ${picked.length} files...`);
+
+      const loaded: FileItem[] = [];
+      let undecodable = 0;
+      await runPool(picked, 5, async (node: any) => {
+        try {
+          const blob = await ghRequest(`${base}/git/blobs/${node.sha}`);
+          if (blob.encoding !== 'base64') return;
+          const bin = atob(String(blob.content).replace(/\s/g, ''));
+          const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+          const content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+          const name = String(node.path).split('/').pop() || node.path;
+          loaded.push({ id: crypto.randomUUID(), name, path: node.path, language: languageFor(name), content });
+        } catch (e: any) {
+          if (e instanceof GitHubError && (e.status === 403 || e.status === 401)) throw e;
+          undecodable++; // binary or unreadable file: skip it, keep going
+        }
+      });
+      if (!loaded.length) throw new Error('Could not read any files from this repository.');
+      loaded.sort((a, b) => a.path.localeCompare(b.path));
+
+      const readme = loaded.find(f => /^readme/i.test(f.name)) || loaded[0];
+      setFiles(loaded);
+      setOpenTabs([readme.id]);
+      setActiveId(readme.id);
+      const message = `Pulled ${display}@${usedBranch}`;
+      const committed = loaded.map(f => ({ ...f, modified: false }));
+      const nextHistory = [`${makeCommitId(message)} ${message}`, ...gitHistory];
+      setGitHistory(nextHistory);
+      setBranchStore(prev => ({ ...prev, [branch]: { files: committed, history: nextHistory } }));
+      setSavedSnapshots(() => Object.fromEntries(committed.map(f => [f.id, f.content])));
+
+      const notes: string[] = [];
+      if (usedBranch !== target) notes.push(`branch '${target}' does not exist, used '${usedBranch}'`);
+      if (skippedBinary + undecodable > 0) notes.push(`${skippedBinary + undecodable} binary/large file(s) skipped`);
+      if (candidates.length > LIMIT) notes.push(`loaded the first ${LIMIT} of ${candidates.length} files`);
+      setGhStatusMsg(`✅ Pulled ${loaded.length} files from ${display}@${usedBranch}${notes.length ? ` (${notes.join('; ')})` : ''}.`);
+      setTerminal(prev => `${prev}\n✓ GitHub pull: ${loaded.length} files from ${display}@${usedBranch}`);
     } catch (err: any) {
-      setGhStatusMsg(`❌ Error: ${err.message}`);
+      setGhStatusMsg(`❌ ${err.message}`);
     } finally {
       setGhLoading(false);
     }
@@ -3885,9 +4086,20 @@ if 'matplotlib.pyplot' in sys.modules:
 
                 <div className="sidebar-pane-body">
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--cf-accent-text, #60a5fa)' }}>
+                    <div className="git-branch-row">
                       <GitBranch size={14} />
-                      <b>{branch}</b>
+                      <select
+                        aria-label="Current branch"
+                        value={branch}
+                        onChange={e => switchBranch(e.target.value)}
+                      >
+                        {branchNames.map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                      <button type="button" className="git-row-btn" title="New branch" aria-label="New branch" onClick={createBranchPrompt}>
+                        <Plus size={13} />
+                      </button>
                     </div>
                     <button
                       className="sidebar-btn-secondary"
@@ -4777,10 +4989,10 @@ if 'matplotlib.pyplot' in sys.modules:
               </div>
 
               <div className="setting-input-block">
-                <label>Branch Name</label>
+                <label>Remote Branch (created if it does not exist)</label>
                 <input
-                  value={branch}
-                  onChange={e => setBranch(e.target.value)}
+                  value={ghBranch}
+                  onChange={e => setGhBranch(e.target.value)}
                   placeholder="main"
                 />
               </div>
@@ -4799,7 +5011,7 @@ if 'matplotlib.pyplot' in sys.modules:
                 </button>
               </div>
               <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
-                Tip: Create a fine-grained PAT with Contents: Read & Write. Pull fetches up to 40 files (recursive tree).
+                Tip: Create a fine-grained token with Contents: Read & Write. Push sends everything as one commit; pull replaces the workspace after you confirm and skips binary files.
               </p>
             </section>
           )}
@@ -5032,9 +5244,13 @@ if 'matplotlib.pyplot' in sys.modules:
                 <b>Source Control (Git)</b>
                 <div className="branch-picker">
                   <GitBranch size={14} />
-                  <button onClick={() => checkout(branch === 'main' ? 'dev' : 'main')}>
-                    {branch}
-                    <ChevronDown size={13} />
+                  <select aria-label="Current branch" value={branch} onChange={e => switchBranch(e.target.value)}>
+                    {branchNames.map(n => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                  <button type="button" title="New branch" aria-label="New branch" onClick={createBranchPrompt}>
+                    <Plus size={13} />
                   </button>
                 </div>
               </div>
@@ -5042,7 +5258,7 @@ if 'matplotlib.pyplot' in sys.modules:
                 <Github size={18} />
                 <div>
                   <b>Local & Remote Git Workspace</b>
-                  <p>Track branches and commits offline, or push to GitHub in 1 click.</p>
+                  <p>Branches and commits are stored on your device. Push to GitHub as a single commit when you are ready.</p>
                 </div>
               </div>
               <textarea

@@ -5385,3 +5385,29 @@ a.tile-btn {
   background: rgba(var(--cf-rgb, 217, 168, 100), 0.12);
   border-color: rgba(var(--cf-rgb, 217, 168, 100), 0.3);
 }
+
+/* local branch picker */
+.git-branch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--cf-accent-text, #60a5fa);
+}
+.git-branch-row select,
+.branch-picker select {
+  min-width: 0;
+  max-width: 150px;
+  padding: 3px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-main);
+  font-weight: 700;
+}
+.branch-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

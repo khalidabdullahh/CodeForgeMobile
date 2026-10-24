@@ -5,6 +5,8 @@ import type { NativeLang } from './remoteRunner';
 
 export interface GitInfo {
   branch: string;
+  /** every local branch name */
+  branches: string[];
   /** paths of files changed since the last commit */
   modified: string[];
   /** commit messages, newest first */
@@ -21,7 +23,7 @@ export type ShellAction =
   | { type: 'preview' }
   | { type: 'open'; path: string }
   | { type: 'git-commit'; message: string }
-  | { type: 'git-branch'; name: string }
+  | { type: 'git-branch'; name: string; create?: boolean; stay?: boolean }
   | { type: 'clear' };
 
 export interface ShellHost {
@@ -789,19 +791,28 @@ async function execGit(args: string[], ctx: Ctx): Promise<CmdResult> {
     case 'log': {
       if (!g.log.length) return fail(`fatal: your current branch '${g.branch}' does not have any commits yet`);
       const oneline = rest.includes('--oneline');
-      return ok(g.log.map((m, i) => (oneline ? `${String(g.log.length - i).padStart(7, '0')} ${m}` : `commit ${String(g.log.length - i).padStart(7, '0')}\n    ${m}\n`)).join('\n'));
+      const parse = (entry: string, i: number) => {
+        const m = entry.match(/^([0-9a-f]{7}) ([\s\S]*)$/);
+        return m ? { id: m[1], msg: m[2] } : { id: String(g.log.length - i).padStart(7, '0'), msg: entry };
+      };
+      return ok(g.log.map((entry, i) => {
+        const { id, msg } = parse(entry, i);
+        return oneline ? `${id} ${msg}` : `commit ${id}\n    ${msg}\n`;
+      }).join('\n'));
     }
     case 'branch': {
-      if (!rest.filter(r => !r.startsWith('-')).length) return ok(`* ${g.branch}`);
-      return { out: '', code: await ctx.host.run({ type: 'git-branch', name: rest.filter(r => !r.startsWith('-'))[0] }) };
+      const names = rest.filter(r => !r.startsWith('-'));
+      if (!names.length) return ok(g.branches.map(b => `${b === g.branch ? '*' : ' '} ${b}`).join('\n'));
+      return { out: '', code: await ctx.host.run({ type: 'git-branch', name: names[0], create: true, stay: true }) };
     }
     case 'checkout':
     case 'switch': {
       const name = rest.filter(r => !r.startsWith('-'))[0];
       if (!name) return fail(`usage: git ${sub} [-b] <branch>`);
       if (sub === 'checkout' && rest.includes('--')) return restoreFiles(rest.slice(rest.indexOf('--') + 1), ctx);
-      if (sub === 'checkout' && ctx.files.has(resolvePath(cwd, name)) && !rest.includes('-b')) return restoreFiles([name], ctx);
-      return { out: '', code: await ctx.host.run({ type: 'git-branch', name }) };
+      const create = rest.includes('-b') || rest.includes('-c') || rest.includes('-B');
+      if (sub === 'checkout' && !create && !g.branches.includes(name) && ctx.files.has(resolvePath(cwd, name))) return restoreFiles([name], ctx);
+      return { out: '', code: await ctx.host.run({ type: 'git-branch', name, create }) };
     }
     case 'restore':
       return restoreFiles(rest.filter(r => !r.startsWith('-')), ctx);
@@ -812,7 +823,7 @@ async function execGit(args: string[], ctx: Ctx): Promise<CmdResult> {
     case 'remote':
       return fail(`git ${sub}: use the "GitHub Sync" panel to push your project to GitHub`);
     default:
-      return fail(`git: '${sub}' is not supported in this terminal (try: status, diff, commit, log, branch, restore)`);
+      return fail(`git: '${sub}' is not supported in this terminal (try: status, diff, commit, log, branch, checkout, restore)`);
   }
 }
 

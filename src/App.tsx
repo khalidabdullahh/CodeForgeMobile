@@ -811,6 +811,10 @@ function App() {
   const [contentSearch, setContentSearch] = useState('');
   const [terminal, setTerminal] = useState('CodeForge Terminal\nType help to see the commands (files, pipes, python, node, g++, javac, git...).');
   const [command, setCommand] = useState('');
+  const termInputRef = useRef<HTMLInputElement>(null);
+  // An inline "type your input here" request from a running program (replaces browser prompt() popups)
+  const [inputRequest, setInputRequest] = useState<{ label: string; resolve: (v: string | null) => void } | null>(null);
+  const stdinQueueRef = useRef<string[]>([]);
   const [view, setView] = useState<View>('editor');
   const [extensions, setExtensions] = useState<Extension[]>(() => {
     try {
@@ -1853,12 +1857,8 @@ function App() {
           setTerminal(prev => `${prev}\n🔴 [PyError] ${text}`);
         },
         stdin: () => {
-          const val = window.prompt('Python input():');
-          if (val !== null) {
-            setTerminal(prev => `${prev}\n⌨️ Input: ${val}`);
-            return val + '\n';
-          }
-          return '\n';
+          const val = takeProgramInput('Python input():');
+          return val === null ? '\n' : val + '\n';
         }
       });
 
@@ -1866,12 +1866,8 @@ function App() {
         pyodide.setStdin({
           error: false,
           stdin: () => {
-            const val = window.prompt('Python input():');
-            if (val !== null) {
-              setTerminal(prev => `${prev}\n⌨️ Input: ${val}`);
-              return val + '\n';
-            }
-            return '\n';
+            const val = takeProgramInput('Python input():');
+          return val === null ? '\n' : val + '\n';
           }
         });
       } catch {}
@@ -1893,11 +1889,59 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // ---- Program input, typed straight into the terminal
+  const readTerminalLine = (label: string): Promise<string | null> =>
+    new Promise(resolve => {
+      setPanel(true);
+      setPanelTab('terminal');
+      setInputRequest({ label, resolve });
+      setTimeout(() => termInputRef.current?.focus(), 80);
+    });
+
+  // Lines typed before a run are consumed by input()/prompt(); a native popup is only the last resort
+  const takeProgramInput = (label: string): string | null => {
+    if (stdinQueueRef.current.length) {
+      const v = stdinQueueRef.current.shift() as string;
+      setTerminal(prev => `${prev}\n⌨️ ${v}`);
+      return v;
+    }
+    const val = window.prompt(label);
+    if (val !== null) setTerminal(prev => `${prev}\n⌨️ ${val}`);
+    return val;
+  };
+
+  // Ask for the program's input in the terminal. Resolves to the lines, or null if the user cancelled.
+  const collectProgramInput = async (needed: boolean, what: string): Promise<string[] | null> => {
+    if (!needed) return [];
+    setPanel(true);
+    setPanelTab('terminal');
+    setTerminal(prev => `${prev}\n⌨️ ${what} reads input. Type each input line below and press Enter. Send an empty line to start.`);
+    const lines: string[] = [];
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const line = await readTerminalLine('input>');
+      if (line === null) {
+        setTerminal(prev => `${prev}\n✗ Cancelled`);
+        return null;
+      }
+      if (line === '') break;
+      lines.push(line);
+    }
+    return lines;
+  };
+
   const runPythonCode = async (code: string, fileName?: string) => {
     if (pyRunning) return;
     setPyRunning(true);
     setPanel(true);
     const targetName = fileName || active?.name || 'script.py';
+    stdinQueueRef.current = [];
+    const typedInput = await collectProgramInput(/\binput\s*\(/.test(code), `${targetName}`);
+    if (typedInput === null) {
+      setPyRunning(false);
+      return;
+    }
+    stdinQueueRef.current = typedInput;
     const isCached = !!(window as any).pyodideInstance;
     if (!isCached) {
       setTerminal(prev => `${prev}\n$ python ${targetName}\n⏳ Downloading Python 3.12 runtime (~6MB WebAssembly, 1st run only)...`);
@@ -1931,12 +1975,8 @@ function App() {
       pyodide.setStdin({
         error: false,
         stdin: () => {
-          const val = window.prompt(`Python input() for ${targetName}:`);
-          if (val !== null) {
-            setTerminal(prev => `${prev}\n⌨️ Input: ${val}`);
-            return val + '\n';
-          }
-          return '\n';
+          const val = takeProgramInput(`Python input() for ${targetName}:`);
+          return val === null ? '\n' : val + '\n';
         }
       });
 
@@ -2006,6 +2046,10 @@ if 'matplotlib.pyplot' in sys.modules:
     setPanel(true);
     const targetName = fileName || active?.name || 'script.js';
     const isTs = /\.tsx?$/i.test(targetName);
+    stdinQueueRef.current = [];
+    const typedInput = await collectProgramInput(/\bprompt\s*\(/.test(code), targetName);
+    if (typedInput === null) return 1;
+    stdinQueueRef.current = typedInput;
     setTerminal(prev => `${prev}\n$ ${isTs ? 'ts-node' : 'node'} ${targetName}\n⏳ Executing ${isTs ? 'TypeScript' : 'JavaScript'}...`);
 
     const fmt = (a: any): string => {
@@ -2039,7 +2083,7 @@ if 'matplotlib.pyplot' in sys.modules:
         throw new Error(`require('${name}') is not available in the browser runner`);
       };
       const runner = new AsyncFunction('console', 'prompt', 'alert', 'exports', 'module', 'require', source);
-      await runner(customConsole, window.prompt.bind(window), window.alert.bind(window), exportsObj, moduleObj, requireStub);
+      await runner(customConsole, (msg?: unknown) => takeProgramInput(String(msg ?? 'Input:')), window.alert.bind(window), exportsObj, moduleObj, requireStub);
       setTerminal(prev => `${prev}\n✓ Process completed.`);
       return 0;
     } catch (err: any) {
@@ -2058,13 +2102,9 @@ if 'matplotlib.pyplot' in sys.modules:
   ): Promise<number> => {
     let stdin = opts.stdin ?? '';
     if (!opts.compileOnly && !opts.hasStdin && needsInput(lang, source)) {
-      const typed = window.prompt('Program input (stdin). Type \\n between lines, or leave empty for none:', '');
-      if (typed === null) {
-        termPrint('✗ Cancelled');
-        return 1;
-      }
-      stdin = typed.replace(/\\n/g, '\n') + (typed ? '\n' : '');
-      if (typed) termPrint(`⌨️ Input: ${typed}`);
+      const typedLines = await collectProgramInput(true, 'This program');
+      if (typedLines === null) return 1;
+      stdin = typedLines.length ? typedLines.join('\n') + '\n' : '';
     }
     termPrint(`⏳ ${opts.compileOnly ? 'Compiling' : 'Compiling and running'} on a remote compiler (needs internet)...`);
     try {
@@ -3537,6 +3577,28 @@ if 'matplotlib.pyplot' in sys.modules:
     return () => remove?.();
   }, []);
 
+  // Keep the whole IDE (and the terminal input) above the on-screen keyboard
+  useEffect(() => {
+    if (!inIdeMode) return;
+    const vv = window.visualViewport;
+    const root = document.documentElement;
+    const apply = () => {
+      const h = vv ? vv.height : window.innerHeight;
+      root.style.setProperty('--app-h', `${Math.round(h)}px`);
+      if (window.scrollY) window.scrollTo(0, 0);
+    };
+    apply();
+    vv?.addEventListener('resize', apply);
+    vv?.addEventListener('scroll', apply);
+    window.addEventListener('resize', apply);
+    return () => {
+      vv?.removeEventListener('resize', apply);
+      vv?.removeEventListener('scroll', apply);
+      window.removeEventListener('resize', apply);
+      root.style.removeProperty('--app-h');
+    };
+  }, [inIdeMode]);
+
   // Always show the desktop IDE layout, even on a phone in portrait:
   // lay the page out ~820px wide and let the browser scale it to fit the screen.
   useEffect(() => {
@@ -3545,7 +3607,8 @@ if 'matplotlib.pyplot' in sys.modules:
     const original = meta.getAttribute('content') || 'width=device-width, initial-scale=1.0';
     const apply = () => {
       const deviceWidth = window.screen.width || window.innerWidth;
-      const next = inIdeMode ? (deviceWidth < 820 ? 'width=820, user-scalable=no' : `${original}, maximum-scale=1.0, user-scalable=no`) : original;
+      const kb = 'interactive-widget=resizes-content';
+      const next = inIdeMode ? (deviceWidth < 820 ? `width=820, user-scalable=no, ${kb}` : `${original}, maximum-scale=1.0, user-scalable=no, ${kb}`) : original;
       if (meta.getAttribute('content') !== next) meta.setAttribute('content', next);
     };
     apply();
@@ -5533,7 +5596,7 @@ if 'matplotlib.pyplot' in sys.modules:
                 </div>
               ) : (
                 <>
-                  <pre ref={terminalOutputRef} className="terminal-output">{terminal}</pre>
+                  <pre ref={terminalOutputRef} className="terminal-output" onClick={() => { if (!window.getSelection()?.toString()) termInputRef.current?.focus(); }}>{terminal}</pre>
 
                   {/* Mobile Quick Terminal Toolbar */}
                   <div className="terminal-quick-toolbar">
@@ -5544,6 +5607,10 @@ if 'matplotlib.pyplot' in sys.modules:
                       onClick={() => {
                         setTerminal(prev => `${prev}\n^C`);
                         setCommand('');
+                        if (inputRequest) {
+                          inputRequest.resolve(null);
+                          setInputRequest(null);
+                        }
                       }}
                     >
                       Ctrl+C
@@ -5611,17 +5678,33 @@ if 'matplotlib.pyplot' in sys.modules:
                   </div>
 
                   <form
-                    className="terminal-input"
+                    className={`terminal-input ${inputRequest ? 'awaiting-input' : ''}`}
                     onSubmit={e => {
                       e.preventDefault();
+                      if (inputRequest) {
+                        const value = command;
+                        const { label, resolve } = inputRequest;
+                        setTerminal(prev => `${prev}\n${label} ${value}`);
+                        setCommand('');
+                        setInputRequest(null);
+                        resolve(value);
+                        return;
+                      }
                       runCommand(command);
                     }}
                   >
-                    <span>{shellCwd ? `~/${shellCwd} $` : '~ $'}</span>
+                    <span>{inputRequest ? inputRequest.label : shellCwd ? `~/${shellCwd} $` : '~ $'}</span>
                     <input
+                      ref={termInputRef}
                       value={command}
                       onChange={e => setCommand(e.target.value)}
+                      onFocus={e => {
+                        const el = e.currentTarget;
+                        // let the keyboard finish opening, then make sure the field is on screen
+                        setTimeout(() => el.scrollIntoView({ block: 'nearest' }), 350);
+                      }}
                       onKeyDown={e => {
+                        if (inputRequest) return;
                         if (e.key === 'ArrowUp') {
                           e.preventDefault();
                           handleHistoryUp();
@@ -5630,10 +5713,17 @@ if 'matplotlib.pyplot' in sys.modules:
                           handleHistoryDown();
                         }
                       }}
-                      placeholder="help, ls, cd, cat, grep, python x.py, g++ x.cpp -o x && ./x"
+                      placeholder={inputRequest ? 'Type the input and press Enter (empty line = done)' : 'Type a command, e.g. python main.py'}
+                      aria-label="Terminal input"
+                      enterKeyHint="send"
+                      autoComplete="off"
                       autoCapitalize="off"
                       autoCorrect="off"
+                      spellCheck={false}
                     />
+                    <button type="submit" className="terminal-send" aria-label="Run command">
+                      <ArrowRight size={16} />
+                    </button>
                   </form>
                 </>
               )}

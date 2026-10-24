@@ -442,7 +442,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
             <span>Languages</span>
           </div>
           <div className="lp-stat">
-            <b>6</b>
+            <b>7</b>
             <span>Editor themes</span>
           </div>
           <div className="lp-stat">
@@ -545,8 +545,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
               <p>Brackets, quotes, arrows and Tab are always a tap away, so you never fight the keyboard.</p>
             </li>
             <li>
-              <h3>Six editor themes</h3>
-              <p>Dracula, One Dark Pro, Monokai, Synthwave &rsquo;84, VS Dark and VS Light.</p>
+              <h3>Seven editor themes</h3>
+              <p>The CodeForge theme you see here, plus Dracula, One Dark Pro, Monokai, Synthwave &rsquo;84, VS Dark and VS Light.</p>
             </li>
           </ul>
         </div>

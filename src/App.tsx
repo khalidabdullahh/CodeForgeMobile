@@ -93,7 +93,7 @@ export type FileItem = { id: string; name: string; path: string; language: strin
 type Extension = { id: string; name: string; description: string; installed: boolean };
 type View = 'editor' | 'preview' | 'extensions' | 'git' | 'settings' | 'ai' | 'templates' | 'github-sync' | 'liveshare' | 'stykanime';
 export type SidebarTab = 'explorer' | 'search' | 'git' | 'debug' | 'ai' | 'extensions' | 'settings';
-type ThemeName = 'vs-dark' | 'light' | 'dracula' | 'one-dark-pro' | 'monokai' | 'synthwave-84';
+type ThemeName = 'codeforge' | 'vs-dark' | 'light' | 'dracula' | 'one-dark-pro' | 'monokai' | 'synthwave-84';
 type AiProvider = 'gemini' | 'openai';
 
 interface AiMessage {
@@ -739,6 +739,7 @@ const AVAILABLE_LANGUAGES = [
 ];
 
 const themeBgMap: Record<ThemeName, string> = {
+  'codeforge': '#0c0d10',
   'vs-dark': '#0b0e12',
   'light': '#f8fafc',
   'dracula': '#282a36',
@@ -821,7 +822,18 @@ function App() {
     return Number.isFinite(n) && n > 0 ? n : 13;
   });
   const [wordWrap, setWordWrap] = useState(true);
-  const [theme, setTheme] = useState<ThemeName>(() => (safeGet('codeforge-theme') as ThemeName) || 'vs-dark');
+  const [theme, setTheme] = useState<ThemeName>(() => {
+    const stored = safeGet('codeforge-theme') as ThemeName | null;
+    // One-time move from the old default (VS Dark) to the new CodeForge theme; later choices are respected
+    if (!safeGet('codeforge-theme-v2')) {
+      safeSet('codeforge-theme-v2', '1');
+      if (!stored || stored === 'vs-dark') {
+        safeSet('codeforge-theme', 'codeforge');
+        return 'codeforge';
+      }
+    }
+    return stored || 'codeforge';
+  });
   const [diagnostics, setDiagnostics] = useState('No problems detected.');
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
 
@@ -1267,17 +1279,42 @@ function App() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  const handleEditorDidMount: OnMount = (editor, monaco) => {
-    editorRef.current = editor;
-    monacoRef.current = monaco;
-
-    editor.onDidChangeCursorPosition((e: any) => {
-      setCurrentCursor({ line: e.position.lineNumber, column: e.position.column });
-      const sym = detectSymbolAtLine(editor.getValue(), active?.language || 'plaintext', e.position.lineNumber);
-      setCurrentSymbol(sym);
+  // Custom Monaco themes are registered before the editor mounts so the first paint already uses them
+  const defineEditorThemes = (monaco: any) => {
+    // Define custom themes
+    monaco.editor.defineTheme('codeforge', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '6f6b60', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'e0a46a' },
+        { token: 'tag', foreground: 'e0a46a' },
+        { token: 'string', foreground: 'a9c28a' },
+        { token: 'attribute.value', foreground: 'a9c28a' },
+        { token: 'number', foreground: 'd9a864' },
+        { token: 'type', foreground: '8fb6c9' },
+        { token: 'attribute.name', foreground: '8fb6c9' },
+        { token: 'function', foreground: 'efe9da' },
+        { token: 'variable', foreground: 'd6d1c3' },
+        { token: 'delimiter', foreground: 'aaa595' }
+      ],
+      colors: {
+        'editor.background': '#0c0d10',
+        'editor.foreground': '#d6d1c3',
+        'editor.lineHighlightBackground': '#efe9da0d',
+        'editorCursor.foreground': '#d9a864',
+        'editor.selectionBackground': '#d9a86433',
+        'editorLineNumber.foreground': '#5d5a50',
+        'editorLineNumber.activeForeground': '#d9a864',
+        'editorGutter.background': '#0c0d10',
+        'editorIndentGuide.background1': '#efe9da14',
+        'editorWidget.background': '#131519',
+        'editorSuggestWidget.background': '#131519',
+        'editorSuggestWidget.selectedBackground': '#d9a86426',
+        'scrollbarSlider.background': '#efe9da1f'
+      }
     });
 
-    // Define custom themes
     monaco.editor.defineTheme('dracula', {
       base: 'vs-dark',
       inherit: true,
@@ -1355,6 +1392,20 @@ function App() {
         'editorCursor.foreground': '#f92aad'
       }
     });
+  };
+
+  const handleEditorDidMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+
+    editor.onDidChangeCursorPosition((e: any) => {
+      setCurrentCursor({ line: e.position.lineNumber, column: e.position.column });
+      const sym = detectSymbolAtLine(editor.getValue(), active?.language || 'plaintext', e.position.lineNumber);
+      setCurrentSymbol(sym);
+    });
+
+    defineEditorThemes(monaco);
+    monaco.editor.setTheme(theme);
   };
 
   const openFile = (id: string) => {
@@ -3748,7 +3799,7 @@ if 'matplotlib.pyplot' in sys.modules:
                         className="sidebar-chip"
                         onClick={() => setMatchCase(v => !v)}
                         title="Match Case"
-                        style={matchCase ? { borderColor: '#3b82f6', color: '#60a5fa', background: 'rgba(59, 130, 246, 0.15)' } : {}}
+                        style={matchCase ? { borderColor: 'var(--cf-accent-mid, #3b82f6)', color: 'var(--cf-accent-text, #60a5fa)', background: 'rgba(var(--cf-rgb, 59, 130, 246), 0.15)' } : {}}
                       >
                         Aa
                       </button>
@@ -3756,7 +3807,7 @@ if 'matplotlib.pyplot' in sys.modules:
                         className="sidebar-chip"
                         onClick={() => setMatchWholeWord(v => !v)}
                         title="Match Whole Word"
-                        style={matchWholeWord ? { borderColor: '#3b82f6', color: '#60a5fa', background: 'rgba(59, 130, 246, 0.15)' } : {}}
+                        style={matchWholeWord ? { borderColor: 'var(--cf-accent-mid, #3b82f6)', color: 'var(--cf-accent-text, #60a5fa)', background: 'rgba(var(--cf-rgb, 59, 130, 246), 0.15)' } : {}}
                       >
                         \b
                       </button>
@@ -3786,7 +3837,7 @@ if 'matplotlib.pyplot' in sys.modules:
                             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', cursor: 'pointer' }}
                             onClick={() => openFile(res.file.id)}
                           >
-                            <span style={{ fontWeight: 600, fontSize: '11px', color: '#60a5fa' }}>{res.file.name}</span>
+                            <span style={{ fontWeight: 600, fontSize: '11px', color: 'var(--cf-accent-text, #60a5fa)' }}>{res.file.name}</span>
                             <span className="sidebar-badge active">{res.matchedLines.length}</span>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -3834,7 +3885,7 @@ if 'matplotlib.pyplot' in sys.modules:
 
                 <div className="sidebar-pane-body">
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#60a5fa' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--cf-accent-text, #60a5fa)' }}>
                       <GitBranch size={14} />
                       <b>{branch}</b>
                     </div>
@@ -4153,6 +4204,7 @@ if 'matplotlib.pyplot' in sys.modules:
                       value={theme}
                       onChange={e => setTheme(e.target.value as ThemeName)}
                     >
+                      <option value="codeforge">CodeForge (default)</option>
                       <option value="vs-dark">VS Code Dark</option>
                       <option value="light">VS Code Light</option>
                       <option value="dracula">Dracula</option>
@@ -4419,6 +4471,7 @@ if 'matplotlib.pyplot' in sys.modules:
                   <Editor
                     height="100%"
                     theme={theme}
+                    beforeMount={defineEditorThemes}
                     language={active?.language || 'plaintext'}
                     value={active?.content || ''}
                     onMount={handleEditorDidMount}
@@ -5032,6 +5085,7 @@ if 'matplotlib.pyplot' in sys.modules:
                   value={theme}
                   onChange={e => setTheme(e.target.value as ThemeName)}
                 >
+                  <option value="codeforge">CodeForge (default)</option>
                   <option value="vs-dark">VS Code Dark</option>
                   <option value="light">VS Code Light</option>
                   <option value="dracula">Dracula</option>
@@ -5781,6 +5835,7 @@ if 'matplotlib.pyplot' in sys.modules:
               <DiffEditor
                 height="100%"
                 theme={theme}
+                beforeMount={defineEditorThemes}
                 language={diffTarget.language}
                 original={savedSnapshots[diffTarget.id] || ''}
                 modified={diffTarget.content}
@@ -5840,7 +5895,7 @@ if 'matplotlib.pyplot' in sys.modules:
           <div className="palette modal-panel" onMouseDown={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
             <div className="view-head" style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Code2 size={18} color="#3b82f6" />
+                <Code2 size={18} color="var(--cf-accent-mid, #3b82f6)" />
                 <b>Select Language Mode</b>
               </div>
               <button className="pill-btn" onClick={() => setShowLanguagePicker(false)}><X size={14} /></button>
@@ -5991,7 +6046,7 @@ if 'matplotlib.pyplot' in sys.modules:
           <div className="palette modal-panel" onMouseDown={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <div className="view-head" style={{ marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <FilePlus2 size={18} color="#3b82f6" />
+                <FilePlus2 size={18} color="var(--cf-accent-mid, #3b82f6)" />
                 <b>Create New File</b>
               </div>
               <button className="pill-btn" onClick={() => setShowNewFileModal(false)}><X size={14} /></button>

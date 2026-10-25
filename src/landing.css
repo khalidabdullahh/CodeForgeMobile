@@ -1043,7 +1043,7 @@
     border-left: 1px solid var(--line);
   }
   .lp-footer {
-    padding-bottom: 54px;
+    padding-bottom: calc(160px + env(safe-area-inset-bottom));
   }
   .lp-footer-inner {
     flex-direction: row;
@@ -1080,6 +1080,9 @@
   .lp-menu,
   .lp-dock {
     display: none;
+  }
+  .lp-footer {
+    padding-bottom: 54px;
   }
   .lp-links {
     display: flex;

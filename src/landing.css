@@ -1065,6 +1065,33 @@
     bottom: 22px;
   }
 }
+/* 700-999px: show the section links in the bar instead of leaving it empty */
+@media (min-width: 700px) and (max-width: 999px) {
+  .lp-links {
+    display: flex;
+    gap: 20px;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .lp-links a:hover {
+    color: var(--paper);
+  }
+  .lp-menu-btn,
+  .lp-menu {
+    display: none;
+  }
+  .lp-brand,
+  .lp-brand div {
+    white-space: nowrap;
+  }
+}
+@media (min-width: 700px) and (max-width: 799px) {
+  .lp-links {
+    gap: 12px;
+    font-size: 13px;
+  }
+}
 @media (min-width: 1000px) {
   .lp-nav-inner {
     height: 72px;

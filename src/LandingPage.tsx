@@ -12,8 +12,6 @@ interface LandingPageProps {
 }
 
 const REPO = 'https://github.com/khalidabdullahh/CodeForgeMobile';
-// Pinned community thread (GitHub Discussions threads do not expire)
-const COMMUNITY_DISCUSSION = `${REPO}/discussions/16`;
 const GITHUB_REPO_API = 'https://api.github.com/repos/khalidabdullahh/CodeForgeMobile';
 const STARS_CACHE_KEY = 'codeforge-gh-stars';
 const STARS_CACHE_MS = 30 * 60 * 1000;
@@ -640,7 +638,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
             <a className="lp-btn lp-btn-primary" href={REPO} target="_blank" rel="noreferrer">
               <Star size={18} /> Star on GitHub {starBadge}
             </a>
-            <a className="lp-btn lp-btn-ghost" href={COMMUNITY_DISCUSSION} target="_blank" rel="noreferrer">
+            <a className="lp-btn lp-btn-ghost" href={`${REPO}/discussions`} target="_blank" rel="noreferrer">
               Join the discussion
             </a>
           </div>

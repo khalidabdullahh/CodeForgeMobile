@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, ChevronUp, Download, ExternalLink, Github, Globe, Menu, Play, Star, X } from 'lucide-react';
-import '@fontsource-variable/cormorant-garamond/wght.css';
-import '@fontsource-variable/cormorant-garamond/wght-italic.css';
+import '@fontsource/chelsea-market/400.css';
+import '@fontsource/cabin-sketch/400.css';
+import '@fontsource/cabin-sketch/700.css';
 import './landing.css';
 
 interface LandingPageProps {

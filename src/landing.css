@@ -1,6 +1,6 @@
 /* =====================================================================
    CodeForge Mobile: landing page
-   Editorial dark theme, set entirely in Cormorant Garamond.
+   Editorial dark theme, set in Chelsea Market (body) + Cabin Sketch (display).
    Everything is scoped under .lp so it never touches the IDE.
    ===================================================================== */
 .lp {
@@ -14,7 +14,8 @@
   --line-strong: rgba(239, 233, 218, 0.28);
   --accent: #d9a864;
   --accent-ink: #1b1409;
-  --serif: 'Cormorant Garamond Variable', 'Cormorant Garamond', 'Cormorant', Garamond, Georgia, 'Times New Roman', serif;
+  --serif: 'Chelsea Market', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --display: 'Cabin Sketch', 'Chelsea Market', system-ui, sans-serif;
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
   color-scheme: dark;
@@ -25,14 +26,15 @@
   background: var(--ink);
   color: var(--paper);
   font-family: var(--serif);
-  font-size: 19px;
+  font-size: 15.58px;
   font-weight: 500;
   line-height: 1.55;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-feature-settings: 'liga', 'kern', 'onum';
+  font-synthesis: none; /* Chelsea Market / Cabin Sketch have no italic or extra weights */
+  font-feature-settings: 'liga', 'kern';
 }
 .lp *,
 .lp *::before,
@@ -41,6 +43,18 @@
   font-family: var(--serif);
 }
 /* Code samples are the one place a monospace face is still the right tool */
+/* Display face: headings, brand, eyebrow, stat numbers */
+.lp h1,
+.lp h1 *,
+.lp h2,
+.lp h2 *,
+.lp .lp-brand,
+.lp .lp-brand span,
+.lp .lp-eyebrow,
+.lp .lp-stat b {
+  font-family: var(--display);
+  font-weight: 700;
+}
 .lp .lp-code,
 .lp .lp-code * {
   font-family: var(--mono);
@@ -86,7 +100,7 @@
 /* ---------- buttons & small labels (phone sizes first) ---------- */
 .lp-eyebrow {
   display: inline-block;
-  font-size: 13px;
+  font-size: 10.66px;
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -102,7 +116,7 @@
   padding: 0 24px;
   border-radius: 999px;
   border: 1px solid transparent;
-  font-size: 20px;
+  font-size: 16.4px;
   font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
@@ -126,7 +140,7 @@
   width: auto;
   min-height: 46px;
   padding: 0 20px;
-  font-size: 18px;
+  font-size: 14.76px;
 }
 .lp-stars {
   font-weight: 700;
@@ -169,7 +183,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 23px;
+  font-size: 18.86px;
   font-weight: 700;
   letter-spacing: 0.01em;
   min-height: 48px;
@@ -215,7 +229,7 @@
   align-items: center;
   justify-content: space-between;
   min-height: 56px;
-  font-size: 24px;
+  font-size: 19.68px;
   font-weight: 600;
   border-bottom: 1px solid var(--line);
 }
@@ -235,7 +249,7 @@
 .lp-hero h1 {
   margin: 16px auto 0;
   max-width: 17ch;
-  font-size: clamp(44px, 12.5vw, 64px);
+  font-size: clamp(36.08px, 10.25vw, 52.48px);
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.015em;
@@ -243,7 +257,7 @@
 .lp-hero-sub {
   max-width: 34em;
   margin: 20px auto 0;
-  font-size: 21px;
+  font-size: 17.22px;
   line-height: 1.45;
   color: var(--muted);
 }
@@ -257,13 +271,13 @@
 }
 .lp-meta {
   margin-top: 18px;
-  font-size: 16px;
+  font-size: 13.12px;
   font-style: italic;
   color: var(--faint);
 }
 .lp-platform-hint {
   margin-top: 10px;
-  font-size: 17px;
+  font-size: 13.94px;
   color: var(--muted);
 }
 
@@ -317,7 +331,7 @@
   border-radius: 10px;
   background: transparent;
   color: var(--faint);
-  font-size: 17px;
+  font-size: 13.94px;
   font-weight: 600;
   cursor: pointer;
   touch-action: manipulation;
@@ -381,7 +395,7 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 11.48px;
   color: var(--muted);
 }
 .lp-window-foot {
@@ -414,12 +428,12 @@
   font-variant-numeric: lining-nums;
   font-feature-settings: 'lnum';
   display: block;
-  font-size: 38px;
+  font-size: 31.16px;
   font-weight: 600;
   line-height: 1.1;
 }
 .lp-stat span {
-  font-size: 14px;
+  font-size: 11.48px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 700;
@@ -441,14 +455,14 @@
 }
 .lp-section-head h2 {
   margin-top: 12px;
-  font-size: clamp(36px, 10vw, 48px);
+  font-size: clamp(29.52px, 8.2vw, 39.36px);
   font-weight: 600;
   line-height: 1.04;
   letter-spacing: -0.01em;
 }
 .lp-section-head p {
   margin-top: 16px;
-  font-size: 21px;
+  font-size: 17.22px;
   line-height: 1.5;
   color: var(--muted);
 }
@@ -465,20 +479,20 @@
 }
 .lp-feature .no {
   display: block;
-  font-size: 26px;
+  font-size: 21.32px;
   font-style: italic;
   font-weight: 500;
   color: var(--accent);
 }
 .lp-feature h3 {
   margin-top: 10px;
-  font-size: 29px;
+  font-size: 23.78px;
   font-weight: 700;
   line-height: 1.15;
 }
 .lp-feature p {
   margin-top: 8px;
-  font-size: 20px;
+  font-size: 16.4px;
   line-height: 1.5;
   color: var(--muted);
 }
@@ -503,12 +517,12 @@
   border-bottom: 1px solid var(--line);
 }
 .lp-points h3 {
-  font-size: 27px;
+  font-size: 22.14px;
   font-weight: 700;
 }
 .lp-points p {
   margin-top: 4px;
-  font-size: 20px;
+  font-size: 16.4px;
   color: var(--muted);
 }
 
@@ -525,18 +539,18 @@
   border-bottom: 1px solid var(--line);
 }
 .lp-lang-row h3 {
-  font-size: 28px;
+  font-size: 22.96px;
   font-weight: 700;
 }
 .lp-lang-row p {
   grid-column: 1 / -1;
   grid-row: 2;
-  font-size: 19px;
+  font-size: 15.58px;
   color: var(--muted);
 }
 .lp-lang-row .tag {
   justify-self: end;
-  font-size: 13px;
+  font-size: 10.66px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 700;
@@ -552,7 +566,7 @@
 }
 .lp-note {
   margin-top: 18px;
-  font-size: 17px;
+  font-size: 13.94px;
   font-style: italic;
   color: var(--faint);
 }
@@ -581,12 +595,12 @@
   border-color: rgba(217, 168, 100, 0.55);
 }
 .lp-tile h3 {
-  font-size: 29px;
+  font-size: 23.78px;
   font-weight: 700;
 }
 .lp-tile p {
   margin: 8px 0 20px;
-  font-size: 19px;
+  font-size: 15.58px;
   color: var(--muted);
   flex: 1 1 auto;
 }
@@ -600,7 +614,7 @@
   display: inline-flex;
   align-items: center;
   margin-top: 4px;
-  font-size: 18px;
+  font-size: 14.76px;
   font-style: italic;
   color: var(--muted);
   background: none;
@@ -636,12 +650,12 @@
 }
 .lp-author h2 {
   margin: 6px 0 10px;
-  font-size: 38px;
+  font-size: 31.16px;
   font-weight: 600;
   line-height: 1.05;
 }
 .lp-author p {
-  font-size: 20px;
+  font-size: 16.4px;
   color: var(--muted);
   line-height: 1.5;
 }
@@ -651,7 +665,7 @@
   justify-content: center;
   gap: 4px 20px;
   margin-top: 12px;
-  font-size: 20px;
+  font-size: 16.4px;
   font-weight: 700;
 }
 .lp-author-links a {
@@ -685,7 +699,7 @@
   border-top: 1px solid var(--line);
 }
 .lp-license h4 {
-  font-size: 14px;
+  font-size: 11.48px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   font-weight: 700;
@@ -695,7 +709,7 @@
   list-style: none;
   margin: 10px 0 0;
   padding: 0;
-  font-size: 20px;
+  font-size: 16.4px;
   color: var(--muted);
 }
 .lp-license li {
@@ -715,7 +729,7 @@
   gap: 16px;
 }
 .lp-footer .lp-brand {
-  font-size: 22px;
+  font-size: 18.04px;
 }
 .lp-footer .lp-brand img {
   width: 30px;
@@ -723,14 +737,14 @@
   border-radius: 8px;
 }
 .lp-footer p {
-  font-size: 16px;
+  font-size: 13.12px;
   font-style: italic;
   color: var(--faint);
 }
 .lp-footer nav {
   display: flex;
   gap: 8px;
-  font-size: 19px;
+  font-size: 15.58px;
   font-weight: 600;
   color: var(--muted);
 }
@@ -765,7 +779,7 @@
   flex: 1 1 0;
   min-height: 52px;
   padding: 0 12px;
-  font-size: 19px;
+  font-size: 15.58px;
 }
 .lp-top {
   position: fixed;
@@ -812,7 +826,7 @@
   margin-bottom: 12px;
 }
 .lp-modal h3 {
-  font-size: 30px;
+  font-size: 24.6px;
   font-weight: 600;
 }
 .lp-modal-close {
@@ -834,17 +848,17 @@
   border-top: 1px solid var(--line);
 }
 .lp-step .n {
-  font-size: 30px;
+  font-size: 24.6px;
   font-style: italic;
   color: var(--accent);
   line-height: 1;
 }
 .lp-step b {
-  font-size: 21px;
+  font-size: 17.22px;
 }
 .lp-step p {
   margin-top: 4px;
-  font-size: 19px;
+  font-size: 15.58px;
   color: var(--muted);
 }
 .lp-modal-actions {
@@ -902,7 +916,7 @@
    ===================================================================== */
 @media (min-width: 700px) {
   .lp {
-    font-size: 20px;
+    font-size: 16.4px;
   }
   .lp-wrap {
     padding-left: max(28px, env(safe-area-inset-left));
@@ -912,10 +926,10 @@
     padding: 80px 0 60px;
   }
   .lp-hero h1 {
-    font-size: clamp(60px, 8.4vw, 100px);
+    font-size: clamp(49.2px, 6.89vw, 82px);
   }
   .lp-hero-sub {
-    font-size: 24px;
+    font-size: 19.68px;
   }
   .lp-cta {
     grid-auto-flow: column;
@@ -941,7 +955,7 @@
     gap: 12px;
     padding: 8px 18px;
     border-top: 1px solid var(--line);
-    font-size: 16px;
+    font-size: 13.12px;
     font-style: italic;
     color: var(--faint);
   }
@@ -957,7 +971,7 @@
     border-left: 0;
   }
   .lp-stat b {
-    font-size: 46px;
+    font-size: 37.72px;
   }
   .lp-section {
     padding: 100px 0;
@@ -966,10 +980,10 @@
     margin-bottom: 52px;
   }
   .lp-section-head h2 {
-    font-size: clamp(44px, 5.4vw, 62px);
+    font-size: clamp(36.08px, 4.43vw, 50.84px);
   }
   .lp-section-head p {
-    font-size: 23px;
+    font-size: 18.86px;
   }
   .lp-features {
     grid-template-columns: repeat(2, 1fr);
@@ -1000,7 +1014,7 @@
   .lp-lang-row p {
     grid-column: auto;
     grid-row: auto;
-    font-size: 20px;
+    font-size: 16.4px;
   }
   .lp-author {
     grid-template-columns: auto 1fr;
@@ -1014,7 +1028,7 @@
     height: 132px;
   }
   .lp-author h2 {
-    font-size: 44px;
+    font-size: 36.08px;
   }
   .lp-author-links {
     justify-content: flex-start;
@@ -1054,7 +1068,7 @@
     height: 72px;
   }
   .lp-brand {
-    font-size: 26px;
+    font-size: 21.32px;
   }
   .lp-brand img {
     width: 38px;
@@ -1068,7 +1082,7 @@
   .lp-links {
     display: flex;
     gap: 34px;
-    font-size: 19px;
+    font-size: 15.58px;
     font-weight: 600;
     color: var(--muted);
   }

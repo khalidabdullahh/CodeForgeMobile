@@ -23,6 +23,14 @@ export function jsModulesToCjs(code: string): string {
 }
 
 /**
+ * The preview runs in an iframe with srcDoc (document URL is about:srcdoc), so a plain
+ * <a href="#id"> would resolve against the parent page and load the app inside the preview.
+ * This keeps in-page "#fragment" links inside the previewed document and scrolls to the target.
+ */
+const FRAGMENT_LINK_FIX =
+  "(function(){document.addEventListener('click',function(e){if(e.defaultPrevented||e.button>0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;var t=e.target;var a=t&&t.closest?t.closest('a[href]'):null;if(!a)return;var raw=a.getAttribute('href');if(!raw||raw.charAt(0)!=='#')return;var tg=a.getAttribute('target');if(tg&&tg!=='_self')return;e.preventDefault();var id=raw.slice(1);try{id=decodeURIComponent(id)}catch(_){}if(!id||id==='top'){window.scrollTo(0,0);return}var el=document.getElementById(id)||document.getElementsByName(id)[0];if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth'})},true)})();";
+
+/**
  * Build the srcDoc for the live HTML preview.
  * - keeps inline <style>/<script> exactly as written
  * - <link rel=stylesheet href=x.css> and <script src=x.js|x.ts> are replaced by the project file of that name
@@ -80,6 +88,9 @@ export function buildPreviewHtml(
   const bridge = doc.createElement('script');
   bridge.textContent = consoleBridge;
   doc.head.insertBefore(bridge, doc.head.firstChild);
+  const fragmentFix = doc.createElement('script');
+  fragmentFix.textContent = FRAGMENT_LINK_FIX;
+  doc.head.insertBefore(fragmentFix, bridge.nextSibling);
   const viewport = doc.head.querySelector('meta[name="viewport"]');
   if (!viewport) {
     const meta = doc.createElement('meta');

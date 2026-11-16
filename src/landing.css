@@ -4,16 +4,16 @@
    Everything is scoped under .lp so it never touches the IDE.
    ===================================================================== */
 .lp {
-  --ink: #0c0d10;
-  --ink-2: #131519;
-  --ink-3: #1a1d22;
-  --paper: #efe9da;
-  --muted: #aaa595;
-  --faint: #6f6b60;
-  --line: rgba(239, 233, 218, 0.14);
-  --line-strong: rgba(239, 233, 218, 0.28);
-  --accent: #d9a864;
-  --accent-ink: #1b1409;
+  --ink: #120d0b;
+  --ink-2: #1a1210;
+  --ink-3: #261a16;
+  --paper: #ffefce;
+  --muted: #bfae90;
+  --faint: #86745e;
+  --line: rgba(255, 239, 206, 0.14);
+  --line-strong: rgba(255, 239, 206, 0.28);
+  --accent: #ff5a44;
+  --accent-ink: #1f0a06;
   --serif: 'Chelsea Market', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --display: 'Cabin Sketch', 'Chelsea Market', system-ui, sans-serif;
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
@@ -167,7 +167,7 @@
   top: 0;
   z-index: 40;
   padding-top: env(safe-area-inset-top);
-  background: rgba(12, 13, 16, 0.88);
+  background: rgba(18, 13, 11, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
@@ -244,7 +244,7 @@
   position: relative;
   padding: 44px 0 40px;
   text-align: center;
-  background: radial-gradient(90% 40% at 50% 0%, rgba(217, 168, 100, 0.12), transparent 70%);
+  background: radial-gradient(90% 40% at 50% 0%, rgba(220, 49, 32, 0.12), transparent 70%);
 }
 .lp-hero h1 {
   margin: 16px auto 0;
@@ -309,7 +309,7 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: rgba(239, 233, 218, 0.22);
+  background: rgba(255, 239, 206, 0.22);
 }
 .lp-tabs {
   display: flex;
@@ -337,7 +337,7 @@
   touch-action: manipulation;
 }
 .lp-tab.active {
-  background: rgba(239, 233, 218, 0.1);
+  background: rgba(255, 239, 206, 0.1);
   color: var(--paper);
 }
 .lp-code {
@@ -345,7 +345,7 @@
   padding: 16px;
   font-size: 13px;
   line-height: 1.85;
-  color: #d6d1c3;
+  color: #f3e4c0;
   overflow-x: auto;
 }
 .lp-code .ln {
@@ -355,17 +355,17 @@
 .lp-code .num {
   display: inline-block;
   width: 2em;
-  color: #5d5a50;
+  color: #6b5a48;
   user-select: none;
 }
 .lp-code .c-tag {
-  color: #e0a46a;
+  color: #f0b93b;
 }
 .lp-code .c-attr {
-  color: #8fb6c9;
+  color: #ffd98a;
 }
 .lp-code .c-str {
-  color: #a9c28a;
+  color: #ff8a6b;
 }
 .lp-code .caret {
   display: inline-block;
@@ -555,7 +555,7 @@
   text-transform: uppercase;
   font-weight: 700;
   color: var(--accent);
-  border: 1px solid rgba(217, 168, 100, 0.4);
+  border: 1px solid rgba(220, 49, 32, 0.4);
   border-radius: 999px;
   padding: 3px 12px;
   white-space: nowrap;
@@ -592,7 +592,7 @@
   background: var(--ink);
 }
 .lp-tile.featured {
-  border-color: rgba(217, 168, 100, 0.55);
+  border-color: rgba(220, 49, 32, 0.55);
 }
 .lp-tile h3 {
   font-size: 23.78px;
@@ -765,7 +765,7 @@
   display: flex;
   gap: 10px;
   padding: 10px max(14px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
-  background: rgba(12, 13, 16, 0.94);
+  background: rgba(18, 13, 11, 0.94);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--line-strong);
@@ -794,7 +794,7 @@
   place-items: center;
   border-radius: 50%;
   border: 1px solid var(--line-strong);
-  background: rgba(19, 21, 25, 0.94);
+  background: rgba(26, 18, 16, 0.94);
   color: var(--paper);
   cursor: pointer;
 }
@@ -807,7 +807,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(5, 6, 8, 0.78);
+  background: rgba(6, 4, 3, 0.78);
   backdrop-filter: blur(6px);
 }
 .lp-modal {

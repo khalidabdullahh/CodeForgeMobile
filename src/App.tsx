@@ -98,7 +98,7 @@ interface BranchState {
   history: string[];
 }
 
-type ThemeName = 'codeforge' | 'vs-dark' | 'light' | 'dracula' | 'one-dark-pro' | 'monokai' | 'synthwave-84';
+type ThemeName = 'codeforge' | 'vs-dark' | 'light' | 'dracula' | 'one-dark-pro' | 'monokai' | 'synthwave-84' | 'penguin';
 type AiProvider = 'gemini' | 'openai';
 
 interface AiMessage {
@@ -313,7 +313,7 @@ A phone-first, VS Code-inspired coding environment for Android & Web.
 - 🐙 **Real GitHub Cloud Sync & Push** (via PAT)
 - 🎤 **Voice-to-Code Assistant**
 - 👥 **Realtime Live Share Collaboration**
-- 🎨 **Multi-Theme Engine** (VS Dark, Dracula, One Dark, Monokai, Synthwave)
+- 🎨 **Multi-Theme Engine** (VS Dark, Dracula, One Dark, Monokai, Synthwave, Penguin Red)
 - 🖥️ **Live Interactive Preview** with in-app console & split view
 - 📦 **Zip & Android (Capacitor)** packaging support
 - 📴 **Offline PWA** capability
@@ -750,7 +750,8 @@ const themeBgMap: Record<ThemeName, string> = {
   'dracula': '#282a36',
   'one-dark-pro': '#21252b',
   'monokai': '#272822',
-  'synthwave-84': '#241b2f'
+  'synthwave-84': '#241b2f',
+  'penguin': '#120d0b'
 };
 
 function App() {
@@ -1410,6 +1411,37 @@ function App() {
         'editor.foreground': '#f8f8f2',
         'editor.lineHighlightBackground': '#3e3d32',
         'editorCursor.foreground': '#f8f8f0'
+      }
+    });
+
+    monaco.editor.defineTheme('penguin', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '8a7a64', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'f0b93b' },
+        { token: 'tag', foreground: 'f0b93b' },
+        { token: 'string', foreground: 'ff8a6b' },
+        { token: 'attribute.value', foreground: 'ff8a6b' },
+        { token: 'number', foreground: 'ff6a4d' },
+        { token: 'type', foreground: 'ffd98a' },
+        { token: 'attribute.name', foreground: 'ffd98a' },
+        { token: 'function', foreground: 'ffefce' },
+        { token: 'variable', foreground: 'f3e4c0' },
+        { token: 'delimiter', foreground: 'b9a98c' }
+      ],
+      colors: {
+        'editor.background': '#120d0b',
+        'editor.foreground': '#f3e4c0',
+        'editor.lineHighlightBackground': '#dc312022',
+        'editorCursor.foreground': '#f0b93b',
+        'editor.selectionBackground': '#dc312055',
+        'editorLineNumber.foreground': '#6b5a48',
+        'editorLineNumber.activeForeground': '#f0b93b',
+        'editorGutter.background': '#120d0b',
+        'editorWidget.background': '#1c1411',
+        'editorSuggestWidget.background': '#1c1411',
+        'editorSuggestWidget.selectedBackground': '#dc312040'
       }
     });
 
@@ -4486,6 +4518,7 @@ if 'matplotlib.pyplot' in sys.modules:
                       <option value="one-dark-pro">One Dark Pro</option>
                       <option value="monokai">Monokai</option>
                       <option value="synthwave-84">Synthwave '84</option>
+                      <option value="penguin">Penguin Red</option>
                     </select>
                   </div>
 
@@ -5371,6 +5404,7 @@ if 'matplotlib.pyplot' in sys.modules:
                   <option value="one-dark-pro">One Dark Pro</option>
                   <option value="monokai">Monokai</option>
                   <option value="synthwave-84">Synthwave '84</option>
+                      <option value="penguin">Penguin Red</option>
                 </select>
               </div>
 

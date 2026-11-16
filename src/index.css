@@ -167,6 +167,30 @@ button, input, textarea, select {
   --accent: #36f9f6;
 }
 
+/* Penguin Red theme: colors taken from the app logo (ink black, cream, red, beak yellow) */
+.theme-penguin {
+  --bg-primary: #120d0b;
+  --bg-secondary: #1a1210;
+  --bg-tertiary: #261a16;
+  --bg-activity: #0d0908;
+  --bg-statusbar: #dc3120;
+  --border-color: #3a2820;
+  --text-main: #ffefce;
+  --text-muted: #b9a98c;
+  --accent: #dc3120;
+
+  --cf-accent: #dc3120;
+  --cf-accent-deep: #b0241a;
+  --cf-accent-bright: #f0463a;
+  --cf-accent-mid: #e5402f;
+  --cf-accent-text: #f0b93b;
+  --cf-accent-soft: #ffd98a;
+  --cf-accent-dark: #5c140d;
+  --cf-rgb: 220, 49, 32;
+  color: #ffefce;
+  background: #120d0b;
+}
+
 /* Topbar */
 .topbar {
   height: 52px;

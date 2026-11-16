@@ -4,8 +4,8 @@
   "start_url": "./?mode=ide",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#120d0b",
-  "theme_color": "#120d0b",
+  "background_color": "#d02d1c",
+  "theme_color": "#d02d1c",
   "description": "An Android-first, VS Code-inspired coding IDE for phones and the web.",
   "categories": [
     "developer",

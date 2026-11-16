@@ -1,5 +1,5 @@
-const CACHE = 'codeforge-mobile-v3';
-const PRECACHE = ['./', './index.html', './manifest.webmanifest', './icon-192.png'];
+const CACHE = 'codeforge-mobile-v4';
+const PRECACHE = ['./', './index.html', './manifest.webmanifest', './icon-192.png?v=2'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -27,11 +27,22 @@ self.addEventListener('fetch', (e) => {
     );
     return;
   }
-  // Static assets (hashed filenames): cache-first, fill on demand
+  const isHashed = new URL(req.url).pathname.includes('/assets/');
+  if (isHashed) {
+    // Hashed build assets never change: cache-first
+    e.respondWith(
+      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+        return res;
+      }))
+    );
+    return;
+  }
+  // Icons, manifest and other fixed-name files: network-first so logo changes show up immediately
   e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+    fetch(req).then((res) => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
       return res;
-    }))
+    }).catch(() => caches.match(req))
   );
 });

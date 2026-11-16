@@ -279,7 +279,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
       <nav className="lp-nav" aria-label="Main">
         <div className="lp-wrap lp-nav-inner">
           <a className="lp-brand" href="#top" aria-label="CodeForge Mobile home">
-            <img src="./icon-192.png" alt="" width={36} height={36} />
+            <img src="./icon-192.png?v=2" alt="" width={36} height={36} />
             <div>
               CodeForge <span>Mobile</span>
             </div>
@@ -594,7 +594,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
                 const img = e.currentTarget;
                 if (!img.dataset.fallback) {
                   img.dataset.fallback = '1';
-                  img.src = './icon-192.png';
+                  img.src = './icon-192.png?v=2';
                 }
               }}
             />
@@ -674,7 +674,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchIde, onDownloa
       <footer className="lp-footer">
         <div className="lp-wrap lp-footer-inner">
           <a className="lp-brand" href="#top">
-            <img src="./icon-192.png" alt="" width={30} height={30} />
+            <img src="./icon-192.png?v=2" alt="" width={30} height={30} />
             <div>CodeForge Mobile</div>
           </a>
           <p>&copy; 2026 Khalid Abdullah. All rights reserved. Free to use, source-available.</p>
